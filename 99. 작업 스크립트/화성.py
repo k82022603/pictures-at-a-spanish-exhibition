@@ -601,7 +601,7 @@ def _cap(dct, n):
         dct.clear()
 
 
-_RC, _HC, _MC = {}, {}, {}
+_RC, _HC, _MC, _DC = {}, {}, {}, {}
 
 
 def pn(m, dur, vel=0.7, ring=1.0):
@@ -676,3 +676,75 @@ def moog(m, d, gain=1.0, cut=4200, res=0.34, glide=None, vib=0.0, scream=0.0):
         # 무그의 톱니 상단을 접어 경직됨을 없앤다 — 1970년대 라더 필터는 이보다 훨씬 둔했다
         _MC[k] = sg.sosfilt(_sos(7200, "low", 2), y).astype(np.float32)
     return _MC[k]
+
+
+# ═══════════════════════════════════════ 드럼 (WBS 1.1.6)
+# 다른 악기와 같은 규칙을 따른다 — 캐시 상한, 세기 양자화, 씨앗 고정.
+# BL-31 에서 `synth.py` 의 무씨앗 난수를 전부 끊었으므로 여기서 씨앗을 준다.
+
+def drum(kind, gain=1.0, seed=0, midi=48):
+    """kick · snare · hat · hato(열린 하이햇) · tom · crash.
+
+    `seed` 는 **타수**를 넣는다. 같은 타격이 매번 똑같이 들리면 기계가 되고,
+    씨앗 없이 두면 렌더마다 달라진다(T-06). 타수를 넣으면 **곡 안에서는
+    매번 다르고 렌더 사이에서는 같다** — 이 프로젝트가 원하는 성질이다.
+    """
+    _cap(_DC, 420)
+    k = (kind, q(gain, 0.04), int(seed) % 64, int(midi) if kind == "tom" else 0)
+    if k not in _DC:
+        g = k[1]
+        s = k[2]
+        if kind == "kick":
+            y = synth.kick(gain=g, seed=s)
+        elif kind == "snare":
+            y = synth.snare(gain=g, seed=s)
+        elif kind == "hat":
+            y = synth.hat(open_=False, gain=g, seed=s)
+        elif kind == "hato":
+            y = synth.hat(open_=True, gain=g, seed=s)
+        elif kind == "tom":
+            y = synth.tom(midi=k[3], gain=g, seed=s)
+        elif kind == "crash":
+            y = synth.crash(gain=g, seed=s)
+        else:
+            raise ValueError("모르는 드럼 %r" % kind)
+        _DC[k] = y.astype(np.float32)
+    return _DC[k]
+
+
+# 패턴 — `07. 작곡 계획` 16장이 정본이다. 여기에는 격자만 둔다.
+#
+# 값은 (박 위치, 악기, 세기). 위치는 **박 단위**이고 소수를 쓸 수 있다.
+# 하이햇을 4분음표로 두는 것이 이 곡의 핵심이다 — 베이스가 이미 8분음표라
+# 하이햇까지 8분이면 같은 격자를 두 번 말하고 마디가 아니라 질감만 는다.
+
+PAT_5 = ([(0, "kick", 1.00), (3, "snare", 0.86)] +
+         [(b, "hat", 0.34) for b in range(5)])          # 3 + 2
+PAT_6 = ([(0, "kick", 1.00), (3, "snare", 0.86)] +
+         [(b, "hat", 0.34) for b in range(6)])          # 3 + 3
+PAT_4 = ([(0, "kick", 1.00), (1, "snare", 0.88),
+          (2, "kick", 0.92), (3, "snare", 0.88)] +
+         [(b * 0.5, "hat", 0.30) for b in range(8)])    # 1악장 — 장식 없음
+PAT_4S = ([(0, "kick", 1.00), (1, "snare", 0.86),
+           (2, "kick", 0.92), (3, "snare", 0.86)] +
+          [(b, "hat", 0.30) for b in range(4)])         # 9악장 — 하이햇 4분음표
+# 7/8 은 **8분음표 단위**로 센다 (2+2+3). 여기서만 하이햇이 8분이다.
+PAT_78 = ([(0, "kick", 1.00), (2, "kick", 0.90), (4, "snare", 0.92)] +
+          [(b, "hat", 0.32) for b in range(7)])
+# 6/8 — 백비트를 치지 않는다. 그녀의 목소리 위에 백비트가 있으면 반주가 된다.
+PAT_68 = [(0, "kick", 0.80), (3, "hato", 0.26)]
+
+
+def lay_drum(put, t0, unit, pat, gain=1.0, n=0, jitter=None):
+    """패턴 하나를 놓는다. `put(y, 시각, 세기, 팬)` 을 받는다.
+
+    unit  — 한 칸의 초. 4/4·5/4·6/4 는 4분음표, 7/8·6/8 은 8분음표다.
+    n     — 몇 번째 마디인가. 타격 씨앗에 섞어 같은 마디가 반복돼도 미세하게 다르게 한다.
+    """
+    for i, (b, kind, v) in enumerate(pat):
+        tt = t0 + b * unit
+        vv = v * gain
+        if jitter is not None:
+            tt, vv = jitter(tt, vv)
+        pan = {"hat": 0.22, "hato": 0.22, "crash": -0.18}.get(kind, 0.0)
+        put(drum(kind, gain=min(1.0, vv), seed=n * 7 + i), tt, 1.0, pan)

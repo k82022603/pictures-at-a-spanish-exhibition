@@ -14,7 +14,8 @@ import piano
 import ensemble as ens
 import synth
 from 화성 import (Desk, voice_lead, bassline, parse, pcset, STAT,
-                  rick, hamm, moog, tape, pn, st, ny)
+                  rick, hamm, moog, tape, pn, st, ny,
+                  drum, lay_drum, PAT_5, PAT_6, PAT_4S)
 
 SR = 44100
 RNG = np.random.default_rng(20260805)
@@ -27,7 +28,7 @@ TOTAL = 580.0
 #   ③ 서사 — 4악장은 실재의 악장이다. 드럼 키트가 섞이면 그 구분이 흐려진다
 # 지금은 비어 있다. 편성이 정해지기 전에 그릇만 만든다 — WBS 1.1.6 에서 채운다.
 GAINS = {"kb": 6.0, "org": -13.0, "bass": 2.0, "str": 2.0,
-         "gtr": 5.0, "lead": 2.0, "perc": -5.0, "drum": -3.0}
+         "gtr": 5.0, "lead": 2.0, "perc": -5.0, "drum": 2.0}
 D = Desk(TOTAL, list(GAINS), GAINS)
 MARK = []
 CHORDLOG = []          # (시각, 심볼, 보이싱) — 검증용
@@ -228,6 +229,29 @@ lay_line(TH_A, T0B + BT * 23.0, BT, vel=0.72, ring=2.0, oct_=12, pan=-0.22)
 # 검수 판정 — B판(이 줄 있음) 채택 (2026-08-08). A판은 침묵을 유지하는 안이었고
 # 두 판을 발췌 mp3 로 대조받았다. 경위는 `05` 9.13절.
 lay_line(TH_A, T0B + BT * 45.0, BT, vel=0.62, ring=2.2, oct_=12, pan=-0.22)
+
+# (e) 드럼이 여기서 처음 들어온다 — 31.9초 (WBS 1.1.6 · `07` 16.7절)
+#
+# 앞의 31.9초를 비워두는 것이 설계다. 4장의 층 쌓기(피아노 혼자 → 베이스가
+# 조성을 선포 → 화성)를 지켜야 하고, 무엇보다 **베이스가 조성을 선포하는
+# 자리를 드럼이 뺏으면 안 된다.**
+#
+# 31.9초는 주제가 다섯 번 지나간 뒤 베이스만 남는 자리다. 눈(주제)이 감기고
+# 발(베이스)만 남았을 때 **처음으로 발소리에 바닥이 생긴다.**
+#
+# 그리고 38.5초에 여섯 번째 주제가 이 마디 위를 지나간다 — 프레이즈 9박이
+# 마디 11박(5+6)에 대해 어긋나는 것이 **곡에서 처음 들리는 순간**이다.
+#
+# 하이햇은 4분음표다. 베이스가 이미 8분음표라 8분으로 깔면 같은 격자를
+# 두 번 말하게 되고, 그러면 마디가 아니라 질감만 는다 (`07` 16.2절).
+_off0 = 0
+for _i, (_sym, _nb) in enumerate(PROG0):
+    _ts = T0B + BT * (1.0 + _off0)
+    if _i >= 6:                                   # 뒤 여섯 화음 = 31.9초부터
+        lay_drum(lambda y, a, g, p: D["drum"].put(y, a, g, p),
+                 _ts, BT, PAT_5 if _nb == 5 else PAT_6,
+                 gain=0.72, n=_i, jitter=lambda a, v: H(a, v))
+    _off0 += _nb
 
 # ═════════════════════════════════════════════════ 1악장 · 마드리드 (0:50–1:30)
 # 곡 전체에서 유일하게 기능화성이 또렷한 악장. ii–V–I 와 이차 딸림화음.
@@ -550,6 +574,22 @@ while t < 566.0:
                               prev=prev, roll=0.020, hold=0.98)
     t = tn
 LAST = prev
+
+# 드럼 — 성긴 4/4. 하이햇은 4분음표다 (`07` 16.2절)
+# 9악장은 마디가 4박이라 프롬나드의 5+6 이 아니지만, 하이햇을 4분에 두는
+# 규칙은 같다. 여기는 곡에서 가장 두꺼운 텍스처이므로 더 그렇다.
+_t9 = 525.0
+_n9 = 0
+while _t9 < 570.0:
+    for _sym, _nb in PROG9:
+        if _t9 >= 570.0:
+            break
+        if _nb >= 4:
+            lay_drum(lambda y, a, g, p: D["drum"].put(y, a, g, p),
+                     _t9, BT, PAT_4S, gain=0.66, n=_n9,
+                     jitter=lambda a, v: H(a, v))
+        _t9 += _nb * BT
+        _n9 += 1
 
 # 걸음 위에 컴파스가 겹친다 (WBS 1.4.8 — `07` 4장이 적어두고 구현되지 않았던 것)
 #
