@@ -298,8 +298,13 @@ def organ_chord(midis, dur, reg=REG_FULL, gain=1.0, drive=2.2):
 # ------------------------------------------------------------------ moog lead
 def moog(midi, dur, gain=1.0, cut_hi=5200, cut_lo=420, res=0.55,
          glide_from=None, detune=0.012, sub=0.35, scream=0.0, scream_oct=2,
-         seed=None):
+         vib=0.0, vib_hz=5.4, vib_wait=0.45, seed=None):
     """무그 리드. v1.9부터 되먹임 라더(`ladder_nl`)를 쓴다.
+
+    vib — 벨팅 비브라토의 **반음 단위 최대 폭** (WBS 1.4.8). 0 이면 없다.
+    지속음의 앞 `vib_wait` 비율 동안은 곧게 내다가 그 뒤로 폭이 차오른다.
+    사람이 긴 음을 지탱할 때 일어나는 일이고, 처음부터 일정한 기본 비브라토가
+    기계처럼 들리는 이유이기도 하다.
 
     scream 0~1 — 되먹임을 자기발진 임계 너머로 밀어 올린다. 0이면 종전처럼
     레조넌스만 걸린 소리이고, 1이면 필터가 스스로 운다.
@@ -316,6 +321,19 @@ def moog(midi, dur, gain=1.0, cut_hi=5200, cut_lo=420, res=0.55,
                                np.full(n - gl, f)])[:n]
     else:
         fenv = np.full(n, f)
+    if vib > 0:
+        # 벨팅 비브라토 (WBS 1.4.8) — 지속음의 뒤로 갈수록 폭이 넓어진다.
+        #
+        # 사람이 긴 음을 지탱할 때 일어나는 일이다. 처음에는 곧게 내다가
+        # 숨이 길어지면 흔들림이 커진다. 신디사이저의 기본 비브라토는 처음부터
+        # 일정해서 기계처럼 들리는데, 그 차이가 여기 있다.
+        #
+        # `vib` 는 **반음 단위 최대 폭**이다. 0.25 면 사분음쯤 흔들린다.
+        # 앞 `vib_wait` 비율 동안은 0 이고 그 뒤로 선형으로 차오른다.
+        tv = np.arange(n) / SR
+        grow = np.clip((tv / max(dur, 1e-6) - vib_wait) / max(1e-6, 1 - vib_wait), 0, 1)
+        depth = (2.0 ** (vib / 12.0) - 1.0) * grow
+        fenv = fenv * (1.0 + depth * np.sin(2 * np.pi * vib_hz * tv))
     x = saw(fenv) + 0.75 * saw(fenv * (1 + detune), 0.31) + \
         0.5 * square(fenv * 0.5, 0.5) * sub / 0.35 * 0.7
     # filter envelope: snap down then hold (classic Moog "wow")

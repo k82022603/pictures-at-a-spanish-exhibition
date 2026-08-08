@@ -130,7 +130,7 @@ def lay_bass(prog, t0, beat, scale, *, lo=28, hi=53, gain=1.0, density=2.0,
 
 
 def lay_line(line, t0, beat, *, inst="kb", vel=0.7, ring=1.2, oct_=0, pan=-0.12,
-             leg=0.95, glide=False):
+             leg=0.95, glide=False, vib=0.0, bright=0.0):
     t = t0
     prev_m = None
     for m, b in line:
@@ -147,9 +147,13 @@ def lay_line(line, t0, beat, *, inst="kb", vel=0.7, ring=1.2, oct_=0, pan=-0.12,
             D["str"].put(st(mm, dur, vv, voices=7, attack=0.13,
                             release=0.30), tt, 1.0, pan)
         elif inst == "moog":
-            D["lead"].put(moog(mm, dur, gain=vv, cut=4000 + RNG.uniform(0, 1400),
+            # vib · bright 는 WBS 1.4.8 벨팅 (`01` WBS 1.4.8 · `07` 14장).
+            # bright 는 컷오프를 Hz 로 더 밀어 배음을 연다.
+            D["lead"].put(moog(mm, dur, gain=vv,
+                               cut=4000 + bright + RNG.uniform(0, 1400),
                                res=0.30 + RNG.uniform(0, 0.10),
-                               glide=prev_m if glide else None), tt, 1.0, pan)
+                               glide=prev_m if glide else None, vib=vib),
+                          tt, 1.0, pan)
         prev_m = mm
         t += b * beat
     return t
@@ -540,12 +544,50 @@ while t < 566.0:
                               prev=prev, roll=0.020, hold=0.98)
     t = tn
 LAST = prev
+
+# 걸음 위에 컴파스가 겹친다 (WBS 1.4.8 — `07` 4장이 적어두고 구현되지 않았던 것)
+#
+#   "베이스는 여기서 걸음과 컴파스를 동시에 짚는다. 8분음표 행보 위에
+#    컴파스의 강세가 겹친다. 두 리듬이 마지막에 만난다."
+#
+# 위의 lay_bass 가 8분음표 행보를 놓았고, 여기서 그 위에 4악장의 컴파스
+# 강세 자리 {0,3,6,8,10} 을 12박 주기로 겹친다. 화음 주기는 4박이고
+# 컴파스는 12박이라 둘이 계속 어긋나며 흐른다 — 그것이 이 곡의 엔진이다.
+#
+# **566초에서 멈춘다.** F♯ → F 가 일어나는 지점이고, 거기서 컴파스가
+# 물러나며 걸음만 남는다. 그녀의 리듬이 그의 조성으로 편입되는 것과 같다.
+# 그것이 "두 리듬이 마지막에 만난다"의 뜻이다.
+# **8분음표 격자에 놓는다.** 4분음표에 놓으면 ♩=63 에서 한 주기가 11.4초가 되어
+# 리듬으로 안 들리고 띄엄띄엄한 악센트가 된다(4악장은 4.29초다). 8분음표면
+# 5.7초로 4악장에 가까워지고, 무엇보다 **걸음과 같은 격자**가 된다 —
+# `07` 4장이 "8분음표 행보 **위에**" 겹친다고 쓴 것이 이 뜻이다.
+EB = BT / 2.0
+_C9 = [(ct, sy) for ct, sy, _ in CHORDLOG if 525.0 <= ct < 566.0]
+tc = 525.0
+while tc < 566.0:
+    for bi in (0, 3, 6, 8, 10):
+        tt = tc + bi * EB
+        if tt >= 566.0:
+            break
+        sym = [s for ct, s in _C9 if ct <= tt + 1e-6][-1]
+        r = parse(sym)[0]
+        m = 33 + (r - 33) % 12                    # B♭1~A2 에서 근음을 짚는다
+        vv = 0.46 if bi in (0, 6) else 0.32       # 컴파스의 두 극점이 세다
+        a, v2 = H(tt, vv)
+        D["bass"].put(rick(m, EB * 0.9, vel=min(0.9, v2), ring=0.34), a, 1.0, -0.05)
+    tc += 12 * EB
+
 # 두 주제 동시
 lay_line(TH_A, 527.0, BT, vel=0.72, ring=2.8, oct_=12, pan=-0.24)
 lay_line(TH_A, 527.0, BT, inst="org", vel=0.30, ring=0.4, oct_=12, pan=-0.10)
 lay_line(TH_B_RES, 527.0, BT, inst="moog", vel=0.46, ring=0.5, pan=0.26, glide=True)
+# 두 번째 총주에서 그녀가 벨팅한다 (WBS 1.4.8, v1.18)
+#   ① 정점에서 비브라토 폭이 넓어진다  ② 배음이 밝아진다
+# 지속음의 뒤로 갈수록 흔들림이 차오르므로, 짧은 음에는 거의 안 걸리고
+# 프레이즈 끝의 긴 음에서만 드러난다 — 사람이 긴 음을 지탱할 때와 같다.
 lay_line(TH_A, 549.0, BT, vel=0.76, ring=3.0, oct_=12, pan=-0.24)
-lay_line(TH_B_RES, 549.0, BT, inst="moog", vel=0.50, ring=0.5, pan=0.26, glide=True)
+lay_line(TH_B_RES, 549.0, BT, inst="moog", vel=0.50, ring=0.5, pan=0.26,
+         glide=True, vib=0.30, bright=900)
 
 # ── F♯ → F 해소를 명시적으로 들려준다 ────────────────────────────
 # D–F♯–A (D장3화음, 그녀의 색채) → D–F–A (Dm) → B♭–D–F–A (B♭maj7)
@@ -554,11 +596,15 @@ for k, m in enumerate([50, 54, 57, 62]):
     D["kb"].put(pn(m, 2.6, 0.52, ring=2.2), 566.0 + k * 0.018, 1.0, -0.10)
     D["org"].put(hamm(m, 2.2, synth.REG_SOFT, 0.24), 566.0 + k * 0.018, 1.0, 0.08)
 D["bass"].put(rick(38, 2.6, vel=0.84, ring=1.4), 566.0, 1.0, -0.02)
-D["lead"].put(moog(66, 2.2, gain=0.44, cut=3600, res=0.26), 566.05, 1.0, 0.24)
+# 이 두 음이 곡의 결론이다. F♯ 은 벨팅으로 끝까지 지탱하고,
+# F 로 내려앉을 때 비브라토를 거둔다 — 버티다가 놓는 소리다.
+D["lead"].put(moog(66, 2.2, gain=0.44, cut=3600, res=0.26, vib=0.34),
+              566.05, 1.0, 0.24)
 for k, m in enumerate([50, 53, 57, 62]):                      # F♯ → F
     D["kb"].put(pn(m, 2.4, 0.50, ring=2.4), 569.0 + k * 0.018, 1.0, -0.10)
     D["org"].put(hamm(m, 2.0, synth.REG_SOFT, 0.24), 569.0 + k * 0.018, 1.0, 0.08)
-D["lead"].put(moog(65, 2.0, gain=0.42, cut=3400, res=0.24, glide=66), 569.05, 1.0, 0.24)
+D["lead"].put(moog(65, 2.0, gain=0.42, cut=3400, res=0.24, glide=66, vib=0.0),
+              569.05, 1.0, 0.24)
 D["bass"].put(rick(38, 2.4, vel=0.80, ring=1.4), 569.0, 1.0, -0.02)
 # 마지막 화음 — B♭maj7 이 아니라 순수 B♭. 편입이 끝났다.
 FIN = [46, 50, 53, 58, 62, 65, 70, 74]

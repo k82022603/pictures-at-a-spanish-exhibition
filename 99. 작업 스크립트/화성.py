@@ -661,12 +661,18 @@ def hamm(m, d, reg, gain=1.0):
     return _HC[k]
 
 
-def moog(m, d, gain=1.0, cut=4200, res=0.34, glide=None):
+def moog(m, d, gain=1.0, cut=4200, res=0.34, glide=None, vib=0.0, scream=0.0):
+    """vib · scream 은 WBS 1.4.8 에서 열었다. 기본값 0 이므로 기존 호출은 그대로다.
+
+    **캐시 키에 반드시 넣는다.** 안 넣으면 같은 음높이·길이의 벨팅과 평음이
+    같은 파형을 돌려받아, 비브라토를 걸어도 소리가 안 바뀐다.
+    """
     _cap(_MC, 260)
-    k = (int(m), q(d, 0.03), q(gain, 0.05), int(cut / 200) * 200, q(res, 0.05), glide)
+    k = (int(m), q(d, 0.03), q(gain, 0.05), int(cut / 200) * 200, q(res, 0.05), glide,
+         q(vib, 0.05), q(scream, 0.05))
     if k not in _MC:
         y = synth.moog(int(m), k[1], gain=k[2], cut_hi=k[3], res=k[4],
-                       glide_from=glide, seed=_seed(k[:5]))
+                       glide_from=glide, vib=k[6], scream=k[7], seed=_seed(k[:5]))
         # 무그의 톱니 상단을 접어 경직됨을 없앤다 — 1970년대 라더 필터는 이보다 훨씬 둔했다
         _MC[k] = sg.sosfilt(_sos(7200, "low", 2), y).astype(np.float32)
     return _MC[k]
