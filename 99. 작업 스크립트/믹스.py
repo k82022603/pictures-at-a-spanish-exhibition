@@ -27,12 +27,30 @@ TOTAL = 580.0
 
 
 def parse_send(s):
-    """lead=plate:0.42 → ("lead", ("plate", 0.42))"""
+    """lead=plate:0.42                       곡 전체에 같은 양
+       lead=plate:160@0.15,325@1.0,425@0.7   악장마다 다른 양 (BL-32)
+
+    `초@값` 을 쉼표로 잇는다. 값은 다음 지점까지 유지되고 경계에서 2초에 걸쳐
+    선형으로 건너간다. 악장 시작 시각은 `CLAUDE.md` 6절 타임라인이 정본이다 —
+    0 · 50 · 90 · 105 · 160 · 260 · 275 · 325 · 425 · 525 · 580.
+    """
     name, rest = s.split("=", 1)
     kind, amt = rest.split(":", 1)
     if kind not in ("room", "plate"):
         raise ValueError("잔향 종류는 room 또는 plate — 받은 것 %r" % kind)
-    return name, (kind, float(amt))
+    if "@" not in amt:
+        return name, (kind, float(amt))
+    pts = []
+    for seg in amt.split(","):
+        t, v = seg.split("@", 1)
+        pts.append((float(t), float(v)))
+    return name, (kind, pts)
+
+
+def show_send(kind, amt):
+    if isinstance(amt, list):
+        return "%s %s" % (kind, " ".join("%g초→%g" % p for p in amt))
+    return "%s %g" % (kind, amt)
 
 
 ap = argparse.ArgumentParser(description="스템으로 믹스만 다시 한다")
@@ -59,7 +77,7 @@ print("스템 %s" % a.stems)
 if gains:
     print("페이더 덮어쓰기  " + "  ".join("%s %+.1f dB" % kv for kv in gains.items()))
 if sends:
-    print("성부별 잔향      " + "  ".join("%s → %s %.2f" % (n, k, v)
+    print("성부별 잔향      " + "  ".join("%s → %s" % (n, show_send(k, v))
                                           for n, (k, v) in sends.items()))
 
 D = Desk.load_stems(a.stems, list(GAINS), GAINS)

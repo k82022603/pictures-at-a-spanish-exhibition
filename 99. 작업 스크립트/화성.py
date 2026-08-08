@@ -270,6 +270,47 @@ def plate(x, seed=0, rt60=2.0, damp=7600, hp=190, pre=0.014):
     return y
 
 
+def send_env(spec, k, ramp=2.0):
+    """센드량을 시간에 따라 바꾸는 포락선을 만든다 (BL-32).
+
+    spec = [(시각초, 값), ...]. 값은 다음 지점까지 유지되고, 경계에서
+    `ramp` 초에 걸쳐 선형으로 건너간다. 첫 지점 이전은 첫 값으로 채운다.
+
+    **왜 필요한가** — `07. 작곡 계획` 11장이 세운 설계는 성부마다가 아니라
+    **악장마다** 다르다. 4악장의 그녀는 2005년에 실제로 촬영된 무희이고
+    (V3 가 못박은 유일한 실재의 악장), 7악장에서 상상으로 넘어간다.
+    그러니 같은 무그라도 4악장에서는 마르고 7악장에서는 젖어야 한다.
+    **잔향이 그녀가 얼마나 실재하는지를 재는 눈금이 된다.**
+
+    **왜 잔향 앞에 곱하는가** — 이것은 콘솔의 센드 페이더를 움직이는 것과 같다.
+    잔향 뒤에 곱하면 경계에서 꼬리가 잘린다. 앞에 곱하면 4악장에서 울린 소리의
+    꼬리는 그대로 남은 채 새로 들어오는 소리만 젖기 시작한다 — 그게 자연스럽다.
+
+    `room`·`plate` 는 둘 다 선형이므로 **상수 spec 은 예전 `amt * f(x)` 와
+    수학적으로 같다.** 즉 이 기능을 더해도 기존 소리가 바뀌지 않는다.
+    """
+    env = np.zeros(k, dtype=np.float32)
+    pts = sorted(spec, key=lambda p: p[0])
+    r = max(1, ns(ramp))
+    prev_v = float(pts[0][1])
+    i0 = 0
+    for t, v in pts:
+        i = min(k, max(0, ns(t)))
+        if i > i0:
+            env[i0:i] = prev_v
+        v = float(v)
+        if v != prev_v and i < k:                  # 경계를 선형으로 건넌다
+            j = min(k, i + r)
+            env[i:j] = np.linspace(prev_v, v, j - i, dtype=np.float32)
+            i0 = j
+        else:
+            i0 = i
+        prev_v = v
+    if i0 < k:
+        env[i0:] = prev_v
+    return env
+
+
 def room(x, seed=0):
     """홀 잔향. 9분 40초 × float64 는 메모리를 잡아먹으므로 float32 · 제자리 연산."""
     rng = np.random.default_rng(90210 + seed)
@@ -474,8 +515,14 @@ class Desk:
                     if wL is None:
                         wL = np.zeros(k, dtype=np.float32)
                         wR = np.zeros(k, dtype=np.float32)
-                    wL += np.float32(amt) * f(dl, 0)
-                    wR += np.float32(amt) * f(dr, 1)
+                    if np.isscalar(amt):            # 곡 전체에 같은 양
+                        wL += np.float32(amt) * f(dl, 0)
+                        wR += np.float32(amt) * f(dr, 1)
+                    else:                           # BL-32 — 악장마다 다른 양
+                        env = send_env(amt, k)
+                        wL += f(dl * env, 0)
+                        wR += f(dr * env, 1)
+                        del env
                 elif sends:
                     gL += dl
                     gR += dr
