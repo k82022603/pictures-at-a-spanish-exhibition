@@ -1,6 +1,6 @@
 # 산출물 — 날짜별 음원·영상
 
-**여기에는 파일이 없다. README만 있다.**
+**여기(git)에는 파일이 없다. README만 있다.** 음원은 Drive에 있고, **이 README는 Drive에도 복사된다** — Drive만 열어도 그 음원이 무엇인지 알 수 있어야 하기 때문이다. 정본은 git이므로 **Drive 쪽을 손으로 고치지 않는다.**
 
 파일 실체는 Google Drive에 있다 — [MusicVideo - 스페인 전람회의 그림](https://drive.google.com/drive/folders/1VKkKWI5kTLqeCjlnBL5GTZsc6JbDQHmu)
 

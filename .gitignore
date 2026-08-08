@@ -58,3 +58,12 @@ desktop.ini
 
 # 렌더 기준선·판정본 wav (위 *.wav 에 걸리지만 의도를 남긴다)
 기준선*.wav
+
+# ── rclone 인증 ────────────────────────────────────────────────
+# Drive 접근 토큰이다. 절대 커밋하지 않는다.
+# 프로젝트 폴더 안에 두는 이유는 Claude 의 도구가 프로젝트 밖
+# (%AppData% 등)에서는 검수자와 다른 파일을 보기 때문이다.
+# 노출되면 https://myaccount.google.com/permissions 에서 폐기한다.
+.rclone.conf
+*.rclone.conf
+rclone.conf
