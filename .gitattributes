@@ -1,0 +1,17 @@
+# 줄바꿈 정규화 — 저장소에는 LF, 작업 트리는 OS 기본
+* text=auto
+
+# 파이썬·마크다운은 항상 LF 로 저장한다
+*.py text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+*.json text eol=lf
+
+# 바이너리 (대부분 .gitignore 대상이지만 혹시 들어와도 diff 시도를 막는다)
+*.wav binary
+*.mp3 binary
+*.mp4 binary
+*.mov binary
+*.png binary
+*.pdf binary
+*.docx binary

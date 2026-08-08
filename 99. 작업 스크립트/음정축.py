@@ -1,0 +1,53 @@
+# -*- coding: utf-8 -*-
+"""
+CQT 스펙트럼의 음정축 이미지 생성.
+showcqt 는 x축을 로그 주파수에 선형으로 매핑하므로, C1~C7 6옥타브가
+폭을 정확히 6등분한다. 건반을 그려 넣으면 화면이 곧 음정 자(尺)가 된다.
+그리고 이 곡의 음집합 {B♭ C D E♭ F G A} 을 밝게, F♯ 을 붉게 표시한다.
+"""
+from PIL import Image, ImageDraw, ImageFont
+
+W, H = 1856, 46
+OCT = 6                       # C1 ~ C7
+FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+FS = ImageFont.truetype(FONT, 15)
+FT = ImageFont.truetype(FONT, 12)
+
+BLACK_PC = {1, 3, 6, 8, 10}                 # C♯ E♭ F♯ A♭ B♭
+IN_KEY = {10, 0, 2, 3, 5, 7, 9}             # B♭ C D E♭ F G A — 이 곡의 음집합
+NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]
+
+img = Image.new("RGB", (W, H), (12, 15, 22))
+d = ImageDraw.Draw(img)
+sw = W / (OCT * 12.0)                       # 반음 하나의 폭
+
+for i in range(OCT * 12):
+    pc = i % 12
+    x0 = i * sw
+    x1 = (i + 1) * sw
+    if pc in BLACK_PC:
+        base = (26, 30, 40)
+    else:
+        base = (60, 66, 78)
+    if pc in IN_KEY:
+        base = tuple(min(255, int(c * 1.85)) for c in base)   # 곡의 음집합은 밝게
+    if pc == 6:                                              # F♯ — 유일한 조성 밖 음
+        base = (150, 58, 58)
+    d.rectangle([x0, 6, x1 - 1, H - 15], fill=base)
+
+# 옥타브 경계와 C 표기
+for o in range(OCT + 1):
+    x = o * 12 * sw
+    d.line([(x, 0), (x, H - 1)], fill=(120, 132, 150), width=1)
+    if o < OCT:
+        lbl = "C%d" % (o + 1)
+        d.text((x + 4, H - 14), lbl, font=FS, fill=(190, 200, 214))
+
+# F♯ 자리 표기 — 옥타브마다
+for o in range(OCT):
+    x = (o * 12 + 6) * sw
+    d.text((x + 1, H - 14), "F#", font=FT, fill=(214, 130, 130))
+
+img.save("음정축.png")
+print("음정축.png %dx%d  반음폭 %.2fpx  (C1~C7 6옥타브)" % (W, H, sw))
+print("밝은 건반 = 이 곡의 음집합 B♭ C D E♭ F G A / 붉은 건반 = F♯ (유일한 조성 밖 음)")
