@@ -15,7 +15,7 @@ import ensemble as ens
 import synth
 from 화성 import (Desk, voice_lead, bassline, parse, pcset, STAT,
                   rick, hamm, moog, tape, pn, st, ny,
-                  drum, lay_drum, pat_promenade, pat_finale)
+                  drum, lay_drum, pat_promenade, pat_finale, pat_break)
 
 SR = 44100
 RNG = np.random.default_rng(20260805)
@@ -571,45 +571,128 @@ LAST = prev
 # ══════════════════════════════════ 8악장 · 바르셀로나 (7:05–8:45)
 # 7/8 = 2+2+3. 베이스가 마디를 쪼갠다.
 # 하강 프리지안 4음선 + 반음계 매개화음. 주제 B가 조각난다.
-mark("8악장 바르셀로나 · 7/8 (2+2+3) · 주제 B 파편화", 425.0, seed=20260813)
-BT = 60 / 176.0
-PROG8 = [("Dm", 7), ("Ebmaj7", 7), ("Dm", 7), ("Cm7", 7),
-         ("Bbmaj7", 7), ("D", 7), ("Dm", 7), ("Gm7", 7),
-         ("Ebmaj7", 7), ("D", 7), ("Gm", 7), ("F", 7),
-         ("Ebmaj7", 7), ("Cm7", 7), ("Dm", 7), ("D", 7)]
+mark("8악장 바르셀로나 · 7/8 (2+2+3) · 인스트루멘털 브레이크", 425.0, seed=20260813)
+# WBS 1.4.7 — **이 곡의 유일한 연주 구간이다.** (`07` 18장)
+#
+# 검수자 지적 — "건반하고 드럼이 제대로 놀아야 하는 구간이 있어야 하는데,
+# 전반적으로 곡이 심심합니다." 실사해 보니 맞았다. 열 악장이 조성·박자·편성은
+# 달라도 **하는 일이 같았다** — 화성을 깔고 그 위에 주제를 얹는 것.
+# 프로그레시브 록의 심장인 인스트루멘털 브레이크가 없었다.
+#
+# 옛 8악장은 오르간과 피아노가 **같은 음을 같은 자리에** 쳤다. 두꺼울 뿐
+# 주고받지 않았고, 41마디가 처음부터 끝까지 같은 텍스처였다.
+#
+# 셋을 바꾼다.
+#   ① 템포  ♪=176 → 216. 7/8 마디가 2.39초 → 1.94초 (체감 ♩≈75 → 93)
+#   ② 화성 리듬  마디당 1화음 → **2화음 (4+3박)**. 2+2+3 의 그룹 경계와 맞다.
+#      템포만 올리면 안 빨라진다 — 화음이 느리게 바뀌면 완만하게 들린다
+#   ③ 텍스처  **4마디마다 주역이 바뀐다.** 16마디가 한 바퀴다
+#
+#      마디 0~3    해먼드 리드    빠른 8분 라인. 드럼은 받쳐만
+#      마디 4~7    드럼 주도      오르간은 스탭. 탐으로 굴린다
+#      마디 8~11   무그           주제 B 파편 + **비명** (`07` 14장이 여기로 정했다)
+#      마디 12~15  총주           전부. 크래시
+BT = 60 / 216.0
+# 마디마다 두 화음. 4+3 이 2+2+3 의 그룹 경계와 맞는다
+PROG8 = [("Dm", 4), ("Ebmaj7", 3), ("Dm", 4), ("Cm7", 3),
+         ("Bbmaj7", 4), ("D", 3), ("Dm", 4), ("Gm7", 3),
+         ("Ebmaj7", 4), ("D", 3), ("Gm", 4), ("F", 3),
+         ("Ebmaj7", 4), ("Cm7", 3), ("Dm", 4), ("D", 3),
+         ("Gm7", 4), ("F", 3), ("Ebmaj7", 4), ("Dm", 3),
+         ("Cm7", 4), ("Bbmaj7", 3), ("D", 4), ("Dm", 3),
+         ("Ebmaj7", 4), ("Gm", 3), ("F", 4), ("Ebmaj7", 3),
+         ("Dm", 4), ("D", 3), ("Gm7", 4), ("Dm", 3)]
 GRP = [2, 2, 3]
+# 해먼드 리드 — D 프리지안 7음. ♭2(E♭)를 앞세워 이 선법의 색을 낸다.
+# 7/8 한 마디에 8분음표 일곱. 두 마디가 한 프레이즈다
+RIFF = [62, 63, 65, 67, 65, 63, 62,
+        70, 69, 67, 65, 63, 65, 62]
+END8 = 525.0
 t = 425.0
 prev = LAST
 bar = 0
-while t < 520.0:
-    for sym, _ in PROG8:
-        if t >= 520.0:
+while t < END8:
+    for ci in range(0, len(PROG8), 2):
+        if t >= END8:
             break
-        v = voice_lead(sym, prev, 52, 71, 4)
-        prev = v
-        CHORDLOG.append((t, sym, tuple(v)))
+        role = ("org", "drum", "moog", "tutti")[(bar // 4) % 4]
+        # 한 마디 = 두 화음 (4박 + 3박). 화성 리듬이 옛 판의 두 배다
         off = 0.0
-        for gi, g in enumerate(GRP):
+        for sym, nb in PROG8[ci:ci + 2]:
+            v = voice_lead(sym, prev, 52, 71, 4)
+            prev = v
+            CHORDLOG.append((t + off, sym, tuple(v)))
+            # 오르간 — 역할에 따라 길이가 다르다. 스탭이면 짧게 끊는다
+            hold = {"org": 0.86, "drum": 0.30, "moog": 0.55, "tutti": 0.90}[role]
+            og = {"org": 0.66, "drum": 0.42, "moog": 0.38, "tutti": 0.82}[role]
             for j, m in enumerate(v):
-                tt, vv = H(t + off + j * 0.008, 0.80 if g == 3 else 0.58)
-                D["org"].put(hamm(m, BT * g * 0.82, synth.REG_FULL, vv), tt, 1.0,
+                tt, vv = H(t + off + j * 0.008, og)
+                D["org"].put(hamm(m, BT * nb * hold, synth.REG_FULL, vv), tt, 1.0,
                              -0.20 + 0.08 * j)
-                D["kb"].put(pn(m, BT * g * 0.7, vv * 0.80, ring=0.2),
-                            tt, 1.0, 0.14)
-            # 베이스가 2+2+3을 만든다
+            # 피아노는 오르간을 겹쳐 치지 않는다. 총주에서만 함께 간다
+            if role == "tutti":
+                for j, m in enumerate(v):
+                    tt, vv = H(t + off + j * 0.006, 0.60)
+                    D["kb"].put(pn(m, BT * nb * 0.7, vv, ring=0.2), tt, 1.0, 0.14)
+            off += BT * nb
+        # 베이스가 2+2+3 을 만든다 — 이 악장의 뼈대
+        off = 0.0
+        r0 = parse(PROG8[ci][0])
+        for gi, g in enumerate(GRP):
+            sym = PROG8[ci][0] if gi < 2 else PROG8[ci + 1][0]
             r, degs, _ = parse(sym)
-            bm = 26 + (r + [0, 7, degs[1]][gi] - 26) % 15
             bm = 28 + (r + [0, 7, degs[1]][gi] - 28) % 18
-            tt, vv = H(t + off, 0.88 if gi == 2 else 0.74)
+            tt, vv = H(t + off, 0.90 if gi == 2 else 0.76)
             D["bass"].put(rick(bm, BT * g * 0.8, vel=vv, ring=0.35), tt, 1.0, -0.02)
-            D["perc"].put(synch := ens.cajon(0.42 if gi == 2 else 0.30, "bass"),
-                          H(t + off, 1.0)[0], 1.0, 0.0)
+            # **음정 있는 킥** — 피아노 저역이 막드럼을 대신한다.
+            #
+            # 2026-08-08 청취 판정: "드럼 북 때문에 지저분하다. 차라리 건반을
+            # 킥으로 쓰는 것이 낫겠다." 이 곡의 소리는 전부 음정을 갖는데
+            # 킥·탐만 음정 없는 막이라 **음집합 밖에 혼자 있었다.**
+            #
+            # 베이스보다 한 옥타브 아래를 아주 짧게(ring 0.12) 친다. 길게 두면
+            # 화성이 되고, 짧게 끊으면 타격이 된다.
+            kv = {"org": 0.34, "drum": 0.66, "moog": 0.30, "tutti": 0.72}[role]
+            if gi == 2:
+                kv *= 1.18                      # 2+2+3 의 긴 그룹이 세다
+            kb_m = bm - 12
+            while kb_m < 24:
+                kb_m += 12
+            ka, kvv = H(t + off, kv)
+            D["kb"].put(pn(kb_m, BT * 1.1, kvv, ring=0.12), ka, 1.0, -0.06)
             off += BT * g
-        # 주제 B 파편 — 온전한 프레이즈가 나오지 못한다
-        if bar % 2 == 0:
-            nfrag = 5 if bar % 4 == 0 else 3
+        # 금속과 나무 — 하이햇·림샷·크래시. 막드럼은 없다
+        lay_drum(lambda y, a, g, p: D["drum"].put(y, a, g, p),
+                 t, BT, pat_break(bar, role), gain=0.70, n=bar,
+                 jitter=lambda a, v: H(a, v))
+        # 탐 롤을 대신하는 피아노 저역 하강. 음정이 있으므로 화성 안에 있다
+        if role == "drum" and bar % 4 == 3:
+            for k, mm in enumerate((38, 36, 33, 31, 29, 26)):
+                ka, kvv = H(t + BT * (4.0 + k * 0.5), 0.44 + 0.06 * k)
+                D["kb"].put(pn(mm, BT * 1.4, kvv, ring=0.16), ka, 1.0, -0.10)
+        # ── 주역 ─────────────────────────────────────────────
+        if role == "org":
+            # 해먼드가 8분음표로 달린다. 두 마디에 걸친 프레이즈
+            k0 = (bar % 4) * 7
+            for k in range(7):
+                m = RIFF[(k0 + k) % len(RIFF)]
+                tt, vv = H(t + k * BT, 0.52 if k in (0, 2, 4) else 0.38)
+                D["org"].put(hamm(m + 12, BT * 1.5, synth.REG_FULL, vv),
+                             tt, 1.0, 0.24)
+        elif role == "moog":
+            nfrag = 5 if bar % 4 in (0, 2) else 3
             lay_line([(m, .7) for m, _ in TH_B[:nfrag]], t, BT, inst="moog",
-                     vel=0.40, ring=0.3, pan=0.26, glide=True)
+                     vel=0.44, ring=0.3, pan=0.26, glide=True)
+            if bar % 4 == 3:
+                # **비명.** `07` 14장이 9악장이 아니라 여기로 자리를 정했다 —
+                # 9악장의 서사는 편입이고 자기발진은 저항·파열의 소리다.
+                # 8악장은 주제 B 가 부서지는 악장이므로 여기가 맞다
+                D["lead"].put(moog(74, BT * 5, gain=0.50, cut=5200, res=0.42,
+                                   scream=0.72, vib=0.20),
+                              H(t + BT * 2, 1.0)[0], 1.0, 0.30)
+        elif role == "tutti":
+            lay_line([(m, .7) for m, _ in TH_B[:7]], t, BT, inst="moog",
+                     vel=0.46, ring=0.3, pan=0.26, glide=True)
         t += BT * 7
         bar += 1
 LAST = prev
