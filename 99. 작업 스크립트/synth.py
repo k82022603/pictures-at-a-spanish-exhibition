@@ -379,24 +379,48 @@ def bass(midi, dur, gain=1.0, cut=900, res=0.25):
     y *= env_adsr(n, a=0.004, d=0.05, s=0.8, r=min(0.08, dur * 0.4))
     # pick attack
     nc = n_samples(0.004)
-    y[:nc] += 0.25 * np.random.uniform(-1, 1, nc) * exp_decay(nc, 0.001)
+    y[:nc] += 0.25 * _dnb(nc) * exp_decay(nc, 0.001)
     return gain * np.tanh(y * 1.4) * 0.55
 
 
+def _dnb(n):
+    """`bass()` 픽 어택의 잡음. 드럼과 같은 성질이라 함께 끊었다 (BL-31)."""
+    return np.random.default_rng(31000).uniform(-1, 1, n)
+
+
 # ---------------------------------------------------------------------- drums
-def kick(gain=1.0):
+#
+# BL-31 (2026-08-08) — 여기 있던 씨앗 없는 난수 여섯 곳을 끊었다.
+#
+# 드럼은 지금까지 곡에 한 번도 쓰이지 않아서 조용했을 뿐이다. WBS 1.1.6 에서
+# 살아나는 순간 **렌더가 매번 달라진다.** 그러면 "패턴을 고쳐서 바뀐 것"과
+# "난수가 달라져서 바뀐 것"을 구별할 수 없고, T-06 에서 봤듯이 그 차이는
+# 지표 해상도 아래에 숨는다 — 넉 달 동안 아무도 못 봤다.
+#
+# BL-29·BL-30 을 WBS 1.4 착수 전에 끝낸 것과 같은 논리다. **늦을수록 비싸진다.**
+#
+# 씨앗을 안 주면 각 악기의 고정 기본값을 쓴다 — 같은 소리는 언제나 같은 잡음을
+# 받는다. 한 패턴 안에서 타격마다 다른 잡음을 주고 싶으면 `seed=` 에 타수를 넣는다.
+
+
+def _dn(n, seed, base):
+    """드럼용 균등잡음. 씨앗이 없으면 악기별 고정값을 쓴다 (BL-31)."""
+    return np.random.default_rng(base if seed is None else base + int(seed)).uniform(-1, 1, n)
+
+
+def kick(gain=1.0, seed=None):
     n = n_samples(0.42)
     fe = np.concatenate([np.geomspace(150, 48, n_samples(0.055)),
                          np.full(n - n_samples(0.055), 48.0)])
     y = np.sin(2 * np.pi * np.cumsum(fe) / SR) * exp_decay(n, 0.085)
     nc = n_samples(0.004)
-    y[:nc] += 0.6 * np.random.uniform(-1, 1, nc) * exp_decay(nc, 0.0012)
+    y[:nc] += 0.6 * _dn(nc, seed, 31001) * exp_decay(nc, 0.0012)
     return gain * np.tanh(y * 1.8) * 0.95
 
 
-def snare(gain=1.0, tau=0.11):
+def snare(gain=1.0, tau=0.11, seed=None):
     n = n_samples(0.30)
-    nz = np.random.uniform(-1, 1, n)
+    nz = _dn(n, seed, 31002)
     b, a = signal.butter(2, [180 / (SR / 2), 8200 / (SR / 2)], btype="band")
     nz = signal.lfilter(b, a, nz) * exp_decay(n, tau)
     t = np.arange(n) / SR
@@ -405,28 +429,28 @@ def snare(gain=1.0, tau=0.11):
     return gain * np.tanh(y * 1.5) * 0.8
 
 
-def hat(open_=False, gain=1.0):
+def hat(open_=False, gain=1.0, seed=None):
     tau = 0.26 if open_ else 0.035
     n = n_samples(tau * 4 + 0.02)
-    nz = np.random.uniform(-1, 1, n)
+    nz = _dn(n, seed, 31003 + (7 if open_ else 0))
     b, a = signal.butter(4, 7200 / (SR / 2), btype="high")
     y = signal.lfilter(b, a, nz) * exp_decay(n, tau)
     return gain * y * 0.60
 
 
-def tom(midi=48, gain=1.0):
+def tom(midi=48, gain=1.0, seed=None):
     n = n_samples(0.45)
     f0 = midi2f(midi)
     fe = np.concatenate([np.geomspace(f0 * 1.6, f0, n_samples(0.04)),
                          np.full(n - n_samples(0.04), f0)])
     y = np.sin(2 * np.pi * np.cumsum(fe) / SR) * exp_decay(n, 0.13)
-    nz = np.random.uniform(-1, 1, n) * exp_decay(n, 0.012) * 0.18
+    nz = _dn(n, seed, 31004 + int(midi)) * exp_decay(n, 0.012) * 0.18
     return gain * np.tanh((y + nz) * 1.5) * 0.7
 
 
-def crash(gain=1.0, tau=1.1):
+def crash(gain=1.0, tau=1.1, seed=None):
     n = n_samples(2.6)
-    nz = np.random.uniform(-1, 1, n)
+    nz = _dn(n, seed, 31005)
     b, a = signal.butter(2, 3600 / (SR / 2), btype="high")
     y = signal.lfilter(b, a, nz)
     t = np.arange(n) / SR
