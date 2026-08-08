@@ -429,6 +429,29 @@ def snare(gain=1.0, tau=0.11, seed=None):
     return gain * np.tanh(y * 1.5) * 0.8
 
 
+def rim(gain=1.0, seed=None):
+    """사이드 스틱 — 스틱으로 림을 때리는 소리. 스네어보다 훨씬 작고 건조하다.
+
+    Terence Sullivan 이 〈Mother Russia〉의 절제된 구간에서 쓰는 것이 이것이다.
+    스네어를 세게 치면 백비트가 되어 록이 되고, 그러면 오케스트라와 피아노를
+    받쳐주는 대신 앞으로 나선다. **림샷은 박을 알려주되 앞에 나서지 않는다.**
+
+    구조는 나무 소리다 — 짧은 잡음 어택 + 400~1700Hz 의 마른 공진 몇 개.
+    감쇠가 스네어(0.11초)의 1/5 이라 꼬리가 안 남는다.
+    """
+    n = n_samples(0.09)
+    t = np.arange(n) / SR
+    y = np.zeros(n)
+    for f0, a, tau in [(415.0, 1.00, 0.020), (1180.0, 0.55, 0.011),
+                       (1720.0, 0.30, 0.007)]:
+        y += a * np.sin(2 * np.pi * f0 * t) * exp_decay(n, tau)
+    nc = n_samples(0.0025)
+    y[:nc] += 0.9 * _dn(nc, seed, 31006) * exp_decay(nc, 0.0008)
+    b, a = signal.butter(2, 260 / (SR / 2), btype="high")
+    y = signal.lfilter(b, a, y)
+    return gain * np.tanh(y * 1.3) * 0.42
+
+
 def hat(open_=False, gain=1.0, seed=None):
     tau = 0.26 if open_ else 0.035
     n = n_samples(tau * 4 + 0.02)

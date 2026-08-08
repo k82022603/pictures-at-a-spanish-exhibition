@@ -15,7 +15,7 @@ import ensemble as ens
 import synth
 from 화성 import (Desk, voice_lead, bassline, parse, pcset, STAT,
                   rick, hamm, moog, tape, pn, st, ny,
-                  drum, lay_drum, PAT_5, PAT_6, PAT_4S)
+                  drum, lay_drum, pat_promenade, pat_finale)
 
 SR = 44100
 RNG = np.random.default_rng(20260805)
@@ -75,11 +75,22 @@ def mark(name, t, seed=None):
 
 # ══════════════════════════════════════════════════ 공통 텍스처 함수
 def lay_chords(prog, t0, beat, lo, hi, *, org=0.0, pf=0.0, strg=0.0, gtr=0.0,
-               nv=4, roll=0.016, pan=-0.10, sus=None, prev=None, hold=0.96):
-    """화성 진행을 놓는다. 반환 (끝 시각, 마지막 보이싱, 각 화음 시각 리스트)"""
+               nv=4, roll=0.016, pan=-0.10, sus=None, prev=None, hold=0.96,
+               until=None):
+    """화성 진행을 놓는다. 반환 (끝 시각, 마지막 보이싱, 각 화음 시각 리스트)
+
+    `until` — 이 시각을 넘는 화음은 놓지 않는다. **악장 경계다.**
+
+    2026-08-08 실측에서 1악장이 슬롯(50~90초)을 13.9초, 7악장이 12.8초
+    넘겨 다음 악장을 덮고 있었다. 마드리드(♩=138)가 변주 I(♩=96) 위에
+    15초를 겹쳐 울렸고, **두 템포가 동시에 들리니 둘 다 흐려졌다.**
+    "138인데 138로 안 들린다"의 원인이 이것이다.
+    """
     t = t0
     ts = []
     for idx, (sym, beats) in enumerate(prog):
+        if until is not None and t >= until - 1e-6:
+            break
         s2 = sym
         v = voice_lead(s2, prev, lo, hi, nv)
         prev = v
@@ -106,7 +117,7 @@ def lay_chords(prog, t0, beat, lo, hi, *, org=0.0, pf=0.0, strg=0.0, gtr=0.0,
 
 
 def lay_bass(prog, t0, beat, scale, *, lo=28, hi=53, gain=1.0, density=2.0,
-             leap_p=0.14, ring=0.5, seed=3, accent_every=4, hand=None):
+             leap_p=0.14, ring=0.5, seed=3, accent_every=4, hand=None, until=None):
     """hand 이 주어지면 알고리즘을 건너뛰고 손으로 쓴 음높이를 그대로 찍는다 (BL-25).
 
     hand = [[미디음, ...], ...] — prog 의 화음 하나당 리스트 하나.
@@ -130,6 +141,8 @@ def lay_bass(prog, t0, beat, scale, *, lo=28, hi=53, gain=1.0, density=2.0,
                             density=density, accent_every=accent_every)
     t = t0
     for m, d, vs, acc in seq:
+        if until is not None and t >= until - 1e-6:      # 악장 경계
+            break
         tt, vv = H(t, gain * (0.86 if acc else 0.66) * vs)
         D["bass"].put(rick(m, d * 0.92, vel=min(0.95, vv), ring=ring), tt, 1.0, -0.02)
         t += d
@@ -244,13 +257,22 @@ lay_line(TH_A, T0B + BT * 45.0, BT, vel=0.62, ring=2.2, oct_=12, pan=-0.22)
 #
 # 하이햇은 4분음표다. 베이스가 이미 8분음표라 8분으로 깔면 같은 격자를
 # 두 번 말하게 되고, 그러면 마디가 아니라 질감만 는다 (`07` 16.2절).
+#
+# **스네어가 아니라 사이드 스틱(림샷)이다.** 프롬나드는 절제된 구간이고,
+# 스네어를 세게 치면 백비트가 되어 드럼이 앞으로 나선다. 오픈 스네어는
+# 고조되는 9악장에서만 쓴다 (`07` 16.9절).
+#
+# 그리고 **마디마다 다르다.** 매 마디 똑같이 치면 성긴 것이 아니라 기계다.
 _off0 = 0
+_nd0 = 0
 for _i, (_sym, _nb) in enumerate(PROG0):
     _ts = T0B + BT * (1.0 + _off0)
     if _i >= 6:                                   # 뒤 여섯 화음 = 31.9초부터
         lay_drum(lambda y, a, g, p: D["drum"].put(y, a, g, p),
-                 _ts, BT, PAT_5 if _nb == 5 else PAT_6,
-                 gain=0.72, n=_i, jitter=lambda a, v: H(a, v))
+                 _ts, BT, pat_promenade(_nb, _nd0),
+                 gain=0.68 + 0.05 * _nd0,         # 들어오면서 조금씩 자란다
+                 n=_i, jitter=lambda a, v: H(a, v))
+        _nd0 += 1
     _off0 += _nb
 
 # ═════════════════════════════════════════════════ 1악장 · 마드리드 (0:50–1:30)
@@ -267,13 +289,19 @@ MEL1 = [(70, .5), (72, .5), (74, 1), (72, .5), (70, .5), (67, 1),
         (75, .5), (74, .5), (72, 1), (70, 1.5)]
 t = 50.0
 prev = LAST
+END1 = 90.0                                   # 악장 경계. 넘기면 2악장을 덮는다
 for rep in range(2):
-    lay_bass(PROG1, t, BT, BB_MAJ, gain=1.02, density=2.0, leap_p=0.12, seed=21 + rep)
+    if t >= END1:
+        break
+    lay_bass(PROG1, t, BT, BB_MAJ, gain=1.02, density=2.0, leap_p=0.12, seed=21 + rep,
+             until=END1)
     tn, prev, _ = lay_chords(PROG1, t, BT, 52, 70, pf=0.30, org=0.22, strg=0.09,
-                             prev=prev, roll=0.010, hold=0.55)
+                             prev=prev, roll=0.010, hold=0.55, until=END1)
     # 오른손 화음 반주 — 8분음표 백비트
     tt2 = t
     for sym, beats in PROG1:
+        if tt2 >= END1:
+            break
         v = voice_lead(sym, None, 57, 74, 3)
         for k in range(int(beats * 2)):
             if k % 2 == 1:
@@ -282,7 +310,8 @@ for rep in range(2):
                     D["kb"].put(pn(m, BT * 0.34, vv, ring=0.14),
                                 a + j * 0.007, 1.0, 0.16)
         tt2 += beats * BT
-    lay_line(MEL1, t + 4 * BT, BT, vel=0.74, ring=0.6, oct_=12, pan=-0.24)
+    if t + 4 * BT < END1:
+        lay_line(MEL1, t + 4 * BT, BT, vel=0.74, ring=0.6, oct_=12, pan=-0.24)
     t = tn
 LAST = prev
 
@@ -291,11 +320,36 @@ LAST = prev
 mark("2악장 Promenade 변주 I · 두 번째 발소리", 90.0, seed=20260807)
 BT = 60 / 96.0
 PROG2 = [("Bb", 3), ("Gm7", 3), ("Ebmaj7", 3), ("F", 3), ("Bb", 3)]
-lay_chords(PROG2, 90.0, BT, 50, 68, gtr=0.30, strg=0.08, prev=LAST, roll=0.030)
+END2 = 105.0
+# 2026-08-08 — 1악장 슬롯 넘침을 고치자 **이 악장이 비어 있다는 것이 드러났다.**
+# 15초 슬롯에 화성은 9.4초뿐이었고 **베이스·피아노·오르간이 아예 없었다.**
+# 마드리드가 위에 15초를 겹쳐 울려서 그 빈 것이 안 들렸을 뿐이다 (`05` 9.18절).
+#
+# 프롬나드인데 **걷는 몸이 없었다.** `07` 3장이 세운 것이 무너져 있었다.
+# 여기서는 최소한만 채운다 — 화성·베이스·드럼으로 다른 프롬나드 수준까지.
+# **주제 배치는 1.4.10 소관이다** (연결 프롬나드는 양쪽이 있어야 놓는다).
+_p2, _n2 = LAST, 0
+for _rep in range(2):                                  # 15초를 채운다
+    _t2 = 90.0 + _rep * 15 * BT
+    if _t2 >= END2:
+        break
+    lay_bass(PROG2, _t2, BT, BB_MAJ, gain=0.96, density=2.0, leap_p=0.13,
+             seed=22 + _rep, until=END2)               # 걷는 몸
+    _tn2, _p2, _ = lay_chords(PROG2, _t2, BT, 50, 68, gtr=0.30, strg=0.08,
+                              org=0.12, pf=0.16, prev=_p2, roll=0.030, until=END2)
+    for _sym, _nb2 in PROG2:                           # 드럼 — 3박 마디
+        if _t2 >= END2:
+            break
+        lay_drum(lambda y, a, g, p: D["drum"].put(y, a, g, p),
+                 _t2, BT, pat_promenade(_nb2, _n2), gain=0.62,
+                 n=_n2, jitter=lambda a, v: H(a, v))
+        _t2 += _nb2 * BT
+        _n2 += 1
+# 두 번째 발소리 — 기타 캐논. 이 악장의 정체다
 lay_line(TH_A, 90.0, BT, inst="gtr", vel=0.62, ring=1.1, pan=0.18)
 lay_line([(m, b) for m, b in TH_A[:8]], 90.0 + 2 * BT, BT, inst="gtr",
          vel=0.34, ring=1.1, oct_=-12, pan=-0.26)
-LAST = voice_lead("Bb", LAST, 50, 68, 4)
+LAST = _p2
 
 # ═════════════════════════════════════════════════ 3악장 · 세고비아 (1:45–2:40)
 # 코랄. 수도교의 아치가 반복되는 것처럼 하강 4음(G–F–E♭–D)이 반복된다.
@@ -487,12 +541,15 @@ PROG7 = [("Dm7", 6), ("Bbmaj7", 6), ("Gm7", 6), ("Ebmaj7", 6),
 t = 325.0
 prev = LAST
 bar = 0
-while t < 420.0:
+END7 = 425.0                                  # 악장 경계. 넘기면 8악장을 덮는다
+while t < END7:
     tn, prev, ts = lay_chords(PROG7, t, BT, 52, 72, pf=0.0, org=0.20, strg=0.10,
-                              prev=prev, roll=0.0, hold=0.99)
+                              prev=prev, roll=0.0, hold=0.99, until=END7)
     # 알함브라의 물 — 6/8 아르페지오 (피아노)
     bt = t
     for i, (sym, beats) in enumerate(PROG7):
+        if bt >= END7:
+            break
         v = voice_lead(sym, None, 57, 79, 4)
         pat = [0, 1, 2, 3, 2, 1]
         for k in range(6):
@@ -578,18 +635,27 @@ LAST = prev
 # 드럼 — 성긴 4/4. 하이햇은 4분음표다 (`07` 16.2절)
 # 9악장은 마디가 4박이라 프롬나드의 5+6 이 아니지만, 하이햇을 4분에 두는
 # 규칙은 같다. 여기는 곡에서 가장 두꺼운 텍스처이므로 더 그렇다.
+# **드럼이 실제로 놓인 마디만 센다.**
+#
+# 처음에는 화음 인덱스를 그대로 셌는데, `PROG9` 의 7번째가 2박짜리
+# `F7sus4`/`F7` 이라 `_nb >= 4` 에서 걸러진다. 그런데 탐 롤 조건이
+# `n % 8 == 7` 이어서 **하필 그 걸러지는 마디에만 걸렸고, 9악장은 한 바퀴만
+# 돌기 때문에 두 번째 기회도 없었다 — 탐 롤이 곡에 한 번도 안 들어갔다.**
+#
+# 검수자에게 "8마디마다 탐이 굴러 내려간다"고 말하고 그것을 들으라고까지
+# 했다. T-02 가 이름 붙인 실수를 코드가 아니라 말로 저지른 것이다.
 _t9 = 525.0
-_n9 = 0
+_nd9 = 0                                          # 드럼이 놓인 마디만
 while _t9 < 570.0:
     for _sym, _nb in PROG9:
         if _t9 >= 570.0:
             break
         if _nb >= 4:
             lay_drum(lambda y, a, g, p: D["drum"].put(y, a, g, p),
-                     _t9, BT, PAT_4S, gain=0.66, n=_n9,
+                     _t9, BT, pat_finale(_nd9), gain=0.66, n=_nd9,
                      jitter=lambda a, v: H(a, v))
+            _nd9 += 1
         _t9 += _nb * BT
-        _n9 += 1
 
 # 걸음 위에 컴파스가 겹친다 (WBS 1.4.8 — `07` 4장이 적어두고 구현되지 않았던 것)
 #
