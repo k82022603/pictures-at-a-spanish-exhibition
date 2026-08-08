@@ -1,0 +1,60 @@
+# 원본 소재 — 사진 253장 + 무음 MOV 9편 (약 99MB). 저장소에 넣지 않는다.
+2005년 12월 스페인/
+
+# 산출 음원·영상 — 스크립트로 재생성된다
+*.wav
+*.mp3
+*.mp4
+*.mov
+*.MOV
+*.aac
+*.m4a
+
+# 스템 (BL-29) — 렌더하면 다시 생긴다. 7개 합쳐 1.33 GB
+스템/
+
+# 중간 산출물
+*.npy
+*.ass
+음정축.png
+run.log
+seg*.mp4
+r[0-9].mp4
+rv.mp4
+list.txt
+rlist.txt
+영상필터1.txt
+sample*.png
+sample*.mp4
+chk*.wav
+chk*.png
+
+# 파생 문서 — 마크다운이 원본이다 (R1)
+*.docx
+*.pdf
+
+# 참고 악보 (저작권 있는 편곡 스캔 포함)
+자료/
+
+# 파이썬
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# OS
+Thumbs.db
+desktop.ini
+.DS_Store
+
+# ── v2.5 (2026-08-08) GitHub 도입 시 추가 ──────────────────────
+
+# 이 PC의 권한 설정. 다른 환경에 옮기면 경로가 안 맞는다
+.claude/settings.local.json
+
+# 산출물 실체는 Google Drive에 있다. 여기에는 README 만 남긴다.
+# 음원·영상 확장자는 위에서 이미 제외되므로 README.md 만 커밋된다.
+산출물/**/*.zip
+
+# 렌더 기준선·판정본 wav (위 *.wav 에 걸리지만 의도를 남긴다)
+기준선*.wav

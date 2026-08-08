@@ -98,10 +98,14 @@ def main():
             print("  OK    %-16s '%s' — %d개 문서 일치" % (name, val, len(holders)))
 
     print("\n=== 5. 버전 일치 ===")
-    # CLAUDE.md 는 Claude Code 가 이름을 강제하는 인수인계 파일이다.
-    # 머리 표·버전 표기 형식을 따르지 않으므로 이 검사에서만 제외한다.
+    # 둘은 도구가 이름을 강제하는 파일이라 머리 표·버전 표기 형식을 따르지 않는다.
+    # R2 의 예외와 같은 근거이며, 이 검사에서만 제외한다.
+    #   CLAUDE.md  — Claude Code 가 읽는 인수인계 파일
+    #   README.md  — GitHub 저장소의 첫 화면 (v2.5, 2026-08-08 신설)
+    # README 는 정본을 가리키기만 하고 사실을 담지 않으므로 버전을 매길 것이 없다.
+    NO_VERSION = {"CLAUDE.md", "README.md"}
     vers = {}
-    for d in [x for x in docs if x != "CLAUDE.md"]:
+    for d in [x for x in docs if x not in NO_VERSION]:
         m = re.search(r"\*\*v(\d+\.\d+)\*\*\s*\(", texts[d])
         vers[d] = m.group(1) if m else None
         if not vers[d]:
