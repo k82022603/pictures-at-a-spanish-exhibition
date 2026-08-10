@@ -12,7 +12,7 @@
     전곡화성.py   악장 경계(mark) · 템포(BT/BB) · 화음 진행(PROG) · 잔향 곡선
     chordlog.npy  실제로 놓인 화음의 시각 — 슬롯을 넘겼는지 여기서 드러난다
     전곡화성.wav  악장별 RMS
-    스템/*.wav    악장별 편성 (어느 악기가 실제로 소리를 내는가)
+    스템/*.wav    악장별 편성. **페이더를 곱해서** 읽는다 — 스템은 곱하기 전이다
 """
 import io
 import os
@@ -22,6 +22,7 @@ import sys
 import numpy as np
 
 SR = 44100
+NL = chr(10)
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -33,11 +34,24 @@ STEMS = os.path.join(HERE, "스템")
 STEM_NAME = {"kb": "피아노", "org": "해먼드", "bass": "베이스", "str": "현악",
              "gtr": "기타", "lead": "무그", "perc": "팔마스·카혼", "drum": "드럼"}
 
+# **스템은 페이더를 곱하기 전 상태다** (`화성.py` save_stems 주석). 그대로 재면
+# 실제 믹스와 다른 균형이 나온다 — 해먼드는 −13 dB 로 줄여 놓았는데 스템에는
+# 줄이기 전 값이 들어 있어서, 2026-08-10 까지 이 표가 **거의 모든 악장에서
+# 해먼드를 「주인공」으로 찍고 있었다.** 실제로는 피아노와 베이스가 앞이고
+# 해먼드가 앞에 나오는 것은 3·8·9악장뿐이다.
+#
+# 「주인공/배경」은 검수자가 곡을 파악하는 라벨이므로 **틀리면 곡을 잘못 읽게 된다.**
+# 전곡화성.py 의 GAINS 를 그대로 읽어 곱한다.
+def read_gains():
+    src = io.open(SRC, encoding="utf-8").read()
+    m = re.search(r"GAINS = (\{.*?\})", src, re.S)
+    return eval(m.group(1)) if m else {}
+
 
 def read_source():
     """전곡화성.py 에서 악장 경계와 템포를 읽는다."""
     src = io.open(SRC, encoding="utf-8").read().split("\n")
-    movs, cur, tempo, prog = [], None, {}, {}
+    movs, cur, tempo, prog, stages = [], None, {}, {}, {}
     for ln in src:
         m = re.match(r'mark\("(\d)악장 ([^·"]+)', ln)
         if m:
@@ -50,10 +64,38 @@ def read_source():
                 tempo[cur] = 60.0 / eval(m2.group(1))
             except Exception:
                 pass
+        # BL-33 — 템포가 **단계로** 바뀌는 악장. `전곡화성.py` 의 TEMPOn 은
+        # 이제 **음악적 숫자를 그대로** 담고 있으므로 계산하지 않고 읽기만 한다.
+        # 단위는 악장마다 다르다 — 4분음표 · 부점4분 · 2+2+3 그룹 맥박.
+        # 그 단위를 여기서 추측하면 틀리므로 소스의 `단위` 주석에서 읽는다.
+        m4 = re.match(r"TEMPO(\d) = (\[.*)", ln)
+        if m4:
+            n = int(m4.group(1))
+            i0 = src.index(ln)
+            buf, depth = "", 0
+            for ch in NL.join(src[i0:])[ln.index("["):]:
+                buf += ch
+                depth += (ch == "[") - (ch == "]")
+                if depth == 0:
+                    break
+            try:
+                v = eval(buf)
+                nums = [x[-1] if isinstance(x, tuple) else x for x in v]
+                u = "♩"
+                for probe in src[i0:i0 + 4]:
+                    if "단위" in probe:
+                        if "그룹" in probe:
+                            u = "2+2+3 그룹 맥박"
+                        elif "♩." in probe or "부점" in probe:
+                            u = "♩."
+                        break
+                stages[n] = (u, nums)
+            except Exception:
+                pass
         m3 = re.match(r"PROG(\d) = (\[.*)", ln)
         if m3:
             prog[int(m3.group(1))] = m3.group(2)
-    return movs, tempo, prog
+    return movs, tempo, prog, stages
 
 
 def beats_of(prog_text, src_all):
@@ -95,7 +137,7 @@ def loud(db):
 
 def main():
     src_all = io.open(SRC, encoding="utf-8").read()
-    movs, tempo, prog = read_source()
+    movs, tempo, prog, stages = read_source()
     movs.sort()
     bounds = [m[2] for m in movs] + [580.0]
 
@@ -120,6 +162,7 @@ def main():
         if wav.ndim > 1:
             wav = wav.mean(1)
 
+    gains = read_gains()
     stems = {}
     for k in STEM_NAME:
         p = os.path.join(STEMS, "스템-%s.wav" % k)
@@ -127,7 +170,8 @@ def main():
             import scipy.io.wavfile as wf
             _, y = wf.read(p)
             y = y.astype(np.float64)
-            stems[k] = y.mean(1) if y.ndim > 1 else y
+            y = y.mean(1) if y.ndim > 1 else y
+            stems[k] = y * (10.0 ** (gains.get(k, 0.0) / 20.0))   # 페이더를 곱한다
 
     def rms(a, s, e):
         seg = a[int(s * SR):int(e * SR)]
@@ -144,7 +188,18 @@ def main():
         print()
         print("%d악장 · %s" % (n, name))
         print("  시각        %.1f ~ %.1f초  (%.0f초)" % (t0, t1, t1 - t0))
-        if bpm:
+        st = stages.get(n)
+        if st:
+            unit, vals = st
+            print("  빠르기      %s = %s   ← **단계로 바뀐다** (BL-33)"
+                  % (unit, " → ".join("%.0f" % s for s in vals)))
+            if unit.startswith("2+2+3"):
+                print("              4분음표가 아니다. 한 마디에 셋. "
+                      "8분음표로 적으면 %s 이고 세 배 빨라 보인다"
+                      % " → ".join("%.0f" % (s * 7 / 3) for s in vals))
+            for s in vals:
+                print("              %s" % feel(s))
+        elif bpm:
             unit = "♪" if bpm > 140 else "♩"
             print("  빠르기      %s = %.0f%s" % (unit, bpm,
                   "   ← 8분음표 기준. 악보에 ♩로 적으면 두 배 빨라진다" if unit == "♪" else ""))

@@ -12,6 +12,7 @@
 | `mv7 she comes closer 60-72 - from 5m25s.mp3` | 7악장. 그녀가 다가올수록 조인다 | 판단 요청 |
 | `mv1-2 madrid steps up then promenade - from 50s.mp3` | 1악장 132→144, 이어 2악장 104 | 판단 요청 |
 | **`full v3.6 - tempo design 9m40s.mp3`** | **전곡** (320kbps) | **★ 현재 상태** |
+| **`전곡 감상 안내 - v3.6.md`** | **악장별 설명 · 시작·끝 시각 · 어디를 들을 것인가** | 안내 문서 |
 
 ---
 
