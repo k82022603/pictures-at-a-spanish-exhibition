@@ -100,7 +100,17 @@ def main():
     bounds = [m[2] for m in movs] + [580.0]
 
     cl = np.load(CLOG, allow_pickle=True) if os.path.exists(CLOG) else []
-    cts = np.array(sorted(float(r[0]) for r in cl)) if len(cl) else np.array([])
+    # 시각과 악장 번호를 **짝을 유지한 채** 정렬한다. 따로 정렬하면 어긋난다.
+    cts, movs_of = np.array([]), None
+    if len(cl):
+        raw = np.array([float(r[0]) for r in cl])
+        order = np.argsort(raw)
+        cts = raw[order]
+        cmv = os.path.join(HERE, "chordmov.npy")
+        if os.path.exists(cmv):
+            mv = np.load(cmv)
+            if len(mv) == len(raw):
+                movs_of = mv[order]
 
     wav = None
     if os.path.exists(WAV):
@@ -146,25 +156,23 @@ def main():
             if k:
                 print("  화성 리듬   %d개 · %.2f개/초 · 평균 %.2f초마다" %
                       (k, k / (t1 - t0), (t1 - t0) / k))
-            # 슬롯 넘침 — **어림이 아니라 실측한다.**
+            # 슬롯 넘침 — **묻지 말고 기록을 본다.**
             #
-            # 이 악장의 화음 간격을 따라 경계 밖까지 화음이 계속 나타나면
-            # 넘친 것이다. 2026-08-08 에 1악장이 13.9초, 7악장이 12.8초
-            # 넘겨 다음 악장을 덮고 있었고, **두 템포가 겹쳐 울려 둘 다
-            # 흐려졌다.** "138인데 138로 안 들린다"의 원인이었다.
-            inside = cts[m]
-            if len(inside) >= 3:
-                g = float(np.median(np.diff(inside)))
-                last = float(inside[-1])
-                while g > 0.05:
-                    nxt = cts[np.abs(cts - (last + g)) < g * 0.12]
-                    if not len(nxt) or last > t1 + 90:
-                        break
-                    last = float(nxt[0])
-                over = last - t1
-                if over > 1.0:
-                    print("  ⚠ 슬롯 넘침   %.1f초 — 다음 악장을 덮는다 (마지막 화음 %.1f초)"
-                          % (over, last))
+            # 2026-08-08 에 1악장이 13.9초, 7악장이 12.8초 넘겨 다음 악장을
+            # 덮고 있었다. **두 템포가 겹쳐 울려 둘 다 흐려졌다** — "138인데
+            # 138로 안 들린다"의 원인이었다.
+            #
+            # 옛 판은 화음 간격을 좇아 경계 밖을 추적했는데, 다음 악장의 간격이
+            # 비슷하면 **그 화음을 자기 것으로 이어 세어** 오탐이 났다.
+            # 2026-08-10 깨끗한 렌더에 1·6악장 경고가 그렇게 떴다.
+            # 이제 `전곡화성.py` 가 화음마다 악장 번호를 적어 두므로 추측하지 않는다.
+            if movs_of is not None:
+                mine = cts[movs_of == n]
+                if len(mine):
+                    over = float(mine[-1]) - t1
+                    if over > 1.0:
+                        print("  ⚠ 슬롯 넘침   %.1f초 — 다음 악장을 덮는다 "
+                              "(이 악장의 마지막 화음 %.1f초)" % (over, mine[-1]))
         if wav is not None:
             print("  RMS         %.1f dB" % rms(wav, t0, t1))
         parts = []

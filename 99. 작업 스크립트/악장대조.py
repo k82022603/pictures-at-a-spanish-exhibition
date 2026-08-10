@@ -26,6 +26,9 @@ def db(x):
     r = np.sqrt((x ** 2).mean()) if len(x) else 0.0
     return 20 * np.log10(max(r, 1e-12))
 
+# **스테레오 전체 RMS 다.** 검증화성.py 의 모노 합산과 1 dB 안팎 다르므로
+# 이 표의 절대값을 문서에 옮기지 않는다. 이 도구가 보는 것은 **두 렌더의 차이**다.
+print("(스테레오 RMS — 절대값의 정본은 검증화성.py 의 모노 합산)")
 print("%-12s %10s %10s %8s %12s" % ("악장", "기준선", "새 렌더", "차이", "차이 RMS"))
 print("-" * 58)
 for nm, s, e in MOV:

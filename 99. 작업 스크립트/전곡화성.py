@@ -7,6 +7,8 @@ v1.4 기준.  화성 우선 · 성부 진행 자동 최적화 · 테이프 마�
   피아노(주역) · 해먼드(패드) · 리켄배커 베이스(독립 대선율) · 현악(공기)
   나일론 기타(2·4악장) · 무그(7·9악장) · 팔마스·카혼(4악장만, 약하게)
 """
+import re
+
 import numpy as np
 from scipy import signal as sg
 
@@ -32,6 +34,20 @@ GAINS = {"kb": 6.0, "org": -13.0, "bass": 2.0, "str": 2.0,
 D = Desk(TOTAL, list(GAINS), GAINS)
 MARK = []
 CHORDLOG = []          # (시각, 심볼, 보이싱) — 검증용
+# 화음이 **어느 악장 것인가.** 시각만으로는 알 수 없다 — 슬롯을 넘긴 화음은
+# 다음 악장의 시각대에 있기 때문이다. 그래서 놓는 순간에 적어 둔다.
+#
+# 2026-08-10 — 이것이 없어서 `악장표.py` 의 넘침 탐지가 **간격을 좇다가 다음
+# 악장의 화음을 자기 것으로 이어 세고** 있었다. 깨끗한 렌더에 1·6악장 넘침
+# 경고가 떴다. 오탐이 뜨는 탐지기는 다음에 진짜를 놓치게 만든다.
+CHORDMOV = []          # CHORDLOG 와 같은 길이. 악장 번호
+MOVN = 0
+
+
+def clog(t, sym, v):
+    """화음 하나를 기록한다. 시각·심볼·보이싱에 **악장 번호**를 함께 남긴다."""
+    CHORDLOG.append((t, sym, tuple(v)))
+    CHORDMOV.append(MOVN)
 
 
 def H(t, vel, tj=0.010, vj=0.11):
@@ -67,7 +83,11 @@ def mark(name, t, seed=None):
     "무엇이 왜 바뀌었는지"를 매번 판별할 수 없다.
     0악장은 20260805 — 전역 초기값과 같으므로 이전 렌더와 그대로 이어진다.
     """
+    global MOVN
     MARK.append((name, t))
+    _m = re.match(r"(\d)악장", name)
+    if _m:                              # 하위 표시("  컴파스 진입")는 악장을 안 바꾼다
+        MOVN = int(_m.group(1))
     if seed is not None:
         global RNG
         RNG = np.random.default_rng(seed)
@@ -96,7 +116,7 @@ def lay_chords(prog, t0, beat, lo, hi, *, org=0.0, pf=0.0, strg=0.0, gtr=0.0,
         prev = v
         dur = beats * beat * hold
         ts.append(t)
-        CHORDLOG.append((t, sym, tuple(v)))
+        clog(t, sym, v)
         for k, m in enumerate(v):
             tt, vv = H(t + k * roll, 1.0)
             sp = pan + 0.09 * (k - (len(v) - 1) / 2.0)
@@ -278,7 +298,11 @@ for _i, (_sym, _nb) in enumerate(PROG0):
 # ═════════════════════════════════════════════════ 1악장 · 마드리드 (0:50–1:30)
 # 곡 전체에서 유일하게 기능화성이 또렷한 악장. ii–V–I 와 이차 딸림화음.
 mark("1악장 마드리드 · ii–V–I 기능화성", 50.0, seed=20260806)
-BT = 60 / 138.0
+# BL-33 (`07` 19장) — 한 악장 안에서 템포가 단계로 오른다. 132 → 144.
+# 도착의 흥분이 밖에서 주어지는 게 아니라 **자기 안에서 커진다.**
+# 연속 가속이 아니라 단계다 — 단계 안에서는 그리드가 고정이므로 컷을 붙일 수 있다.
+TEMPO1 = [(50.0, 70.0, 60 / 132.0),           # 도착
+          (70.0, 90.0, 60 / 144.0)]           # 흥분
 PROG1 = [("Bb", 4), ("Dm7", 4), ("Cm7", 4), ("F7", 4),
          ("Bb", 4), ("Bb/D", 4), ("Ebmaj7", 4), ("Cm7", 4),
          ("Gm7", 4), ("Cm7", 4), ("F7", 4), ("Bb/D", 4),
@@ -287,38 +311,44 @@ MEL1 = [(70, .5), (72, .5), (74, 1), (72, .5), (70, .5), (67, 1),
         (65, .5), (67, .5), (70, 1), (69, .5), (67, .5), (65, 1),
         (74, .5), (72, .5), (70, 1), (72, .5), (74, .5), (77, 1),
         (75, .5), (74, .5), (72, 1), (70, 1.5)]
-t = 50.0
 prev = LAST
 END1 = 90.0                                   # 악장 경계. 넘기면 2악장을 덮는다
-for rep in range(2):
+# 단계마다 진행을 처음부터 돌린다. 20초에 64박 진행이 다 안 들어가므로 잘리는데,
+# **잘리는 자리가 곧 단계 경계**이고 거기서 템포가 오른다. 원래도 잘려 있었다.
+for rep, (s0, s1, BT) in enumerate(TEMPO1):
+    t = s0
     if t >= END1:
         break
     lay_bass(PROG1, t, BT, BB_MAJ, gain=1.02, density=2.0, leap_p=0.12, seed=21 + rep,
-             until=END1)
+             until=s1)
     tn, prev, _ = lay_chords(PROG1, t, BT, 52, 70, pf=0.30, org=0.22, strg=0.09,
-                             prev=prev, roll=0.010, hold=0.55, until=END1)
+                             prev=prev, roll=0.010, hold=0.55, until=s1)
     # 오른손 화음 반주 — 8분음표 백비트
     tt2 = t
     for sym, beats in PROG1:
-        if tt2 >= END1:
+        if tt2 >= s1:
             break
         v = voice_lead(sym, None, 57, 74, 3)
         for k in range(int(beats * 2)):
-            if k % 2 == 1:
+            if k % 2 == 1 and tt2 + k * BT * 0.5 < s1:
                 a, vv = H(tt2 + k * BT * 0.5, 0.20)
                 for j, m in enumerate(v):
                     D["kb"].put(pn(m, BT * 0.34, vv, ring=0.14),
                                 a + j * 0.007, 1.0, 0.16)
         tt2 += beats * BT
-    if t + 4 * BT < END1:
+    if t + 4 * BT < s1:
         lay_line(MEL1, t + 4 * BT, BT, vel=0.74, ring=0.6, oct_=12, pan=-0.24)
-    t = tn
 LAST = prev
 
 # ═══════════════════════════════════════ 2악장 · Promenade 변주 I (1:30–1:45)
 # 두 번째 기타가 한 마디 늦게 들어온다 — 두 번째 발소리
 mark("2악장 Promenade 변주 I · 두 번째 발소리", 90.0, seed=20260807)
-BT = 60 / 96.0
+# BL-33 — 96 → 104. **프롬나드는 같은 사람의 걸음이다.**
+# 0악장 100 · 2악장 96 · 5악장 88 로 조금씩 처지고 있었다. 같은 사람이 같은
+# 전람회를 걷는데 왜 갈수록 느려지는가. 0악장 100 을 기준으로 모은다.
+# 정확히 100 이 아니라 104 인 것은 이 악장이 **두 번째** 발소리이기 때문이다 —
+# 처음보다 조금 익숙해진 걸음. 5악장이 100 으로 되돌아온다.
+BT = 60 / 104.0
 PROG2 = [("Bb", 3), ("Gm7", 3), ("Ebmaj7", 3), ("F", 3), ("Bb", 3)]
 END2 = 105.0
 # 2026-08-08 — 1악장 슬롯 넘침을 고치자 **이 악장이 비어 있다는 것이 드러났다.**
@@ -384,7 +414,14 @@ for i, m in enumerate([50, 51, 53]):
 # 안달루시아 종지 Gm–F–E♭–D. 마지막 D는 장3화음(F♯) + ♭9(E♭) = 플라멩코 프리지안 화음.
 # 베이스는 여기서 걷기를 멈춘다. 컴파스 강세에만 들어온다.
 mark("4악장 세비야 · D 프리지안 / Gm–F–E♭–D♭9 · 베이스는 걷기를 멈춘다", 160.0, seed=20260809)
-BB = 60 / 168.0                              # 12박 컴파스 = 4.29초
+# BL-33 (`07` 19장) — **플라멩코는 실제로 조인다.**
+# 이 악장은 밀도를 무에서 쌓아 올리는데 템포만 고정이었다. 밀도가 오르면서
+# 속도는 그대로면, 쌓이는 것이 층이 아니라 겹으로만 들린다.
+#
+# 컴파스 여섯 개마다 한 단계씩 조인다. 12박 한 바퀴가 4.74 → 4.29 → 3.75 초.
+# ♩ 로는 76 → 84 → 96 이고, BB 는 그 절반(8분음표)이다.
+TEMPO4 = [60 / 152.0, 60 / 168.0, 60 / 192.0]   # ♩ 76 · 84 · 96
+BB = TEMPO4[0]                               # 들머리는 가장 느린 단계
 CAD = [("Gm7", 3), ("F/A", 3), ("Ebmaj7", 3), ("Dphr", 3)]
 ACC = {0, 3, 6, 8, 10}
 # BL-25 — 밀도 단계(lvl)별로 베이스가 앉는 자리. 강세 자리 ACC 의 부분집합이다.
@@ -418,10 +455,13 @@ mark("  컴파스 진입 · 화성이 층으로 쌓인다", t)
 comp = 0
 while t < 254.0:
     lvl = min(3, comp // 3)                   # 0→3 단계로 밀도가 올라간다
+    # 템포는 컴파스 6개마다. 밀도(3개마다)와 주기가 다르므로 **둘이 어긋나며
+    # 오른다** — 같이 오르면 계단 하나로 뭉쳐 들린다
+    BB = TEMPO4[min(2, comp // 6)]
     for ci, (sym, nb) in enumerate(CAD):
         v = voice_lead(sym, prev, 52, 71, 4)
         prev = v
-        CHORDLOG.append((t, sym, tuple(v)))
+        clog(t, sym, v)
         for b in range(nb):
             bi = ci * 3 + b
             hard = bi in ACC
@@ -458,7 +498,7 @@ while t < 254.0:
     comp += 1
 # 종지 — 프리지안 화음 (F♯ + E♭)
 vD = voice_lead("Dphr", prev, 52, 74, 4)
-CHORDLOG.append((t, "Dphr", tuple(vD)))
+clog(t, "Dphr", vD)
 D["perc"].put(ens.palma(0.86, "clara"), t, 1.0, -0.40)
 D["perc"].put(ens.cajon(0.86, "bass"), t + 0.006, 1.0, 0.0)
 D["perc"].put(ens.tacon(0.80), t + 0.010, 1.0, -0.12)
@@ -471,7 +511,10 @@ LAST = vD
 # 두 주제가 처음 겹친다. 불협을 해소하지 않는다.
 # D7♭9 로 끝내고 해결 없이 E♭장조(6악장)로 넘어간다 — 기만적 전조.
 mark("5악장 Promenade 변주 II · 두 주제 겹침 / 불협 미해소", 260.0, seed=20260810)
-BT = 60 / 88.0
+# BL-33 — 88 → 100. 0악장의 걸음으로 되돌아온다.
+# 이 악장에서 두 주제가 처음 겹치므로 **걸음이 0악장과 같아야** 겹침이 들린다.
+# 88 은 세비야(4악장)의 여운으로 처져 있던 것이었다.
+BT = 60 / 100.0
 PROG5 = [("Gm7", 3), ("Ebmaj7", 3), ("Cm7", 3), ("D7b9", 3), ("D7b9", 2.5)]
 lay_bass(PROG5, 260.0, BT, D_PHR, gain=0.98, density=2.0, leap_p=0.20, seed=51)
 lay_chords(PROG5, 260.0, BT, 51, 70, pf=0.34, strg=0.14, org=0.20,
@@ -533,22 +576,27 @@ LAST = prev
 # 6/8. ♭II(E♭maj7) → i(Dm) 프리지안 종지가 반복된다.
 # 무그가 그녀의 목소리. 주제 A는 침묵한다.
 mark("7악장 그라나다 · 6/8 / ♭II–i 프리지안 종지 · 무그 = 그녀의 목소리", 325.0, seed=20260812)
-BT = 60 / 150.0                               # 8분음표
+# BL-33 (`07` 19장) — ♩.=50 으로 100초를 가면 늘어진다. 60 → 72 두 단계.
+# **그녀가 다가올수록 조인다.** 무그가 네 마디마다 부르는 간격도 함께 좁아진다.
+# BT 는 8분음표. 부점4분(♩.) = 3 × BT 이므로 ♩.=60 이면 ♪=180.
+TEMPO7 = [(325.0, 375.0, 60 / 180.0),         # ♩.=60 — 멀리서
+          (375.0, 425.0, 60 / 216.0)]         # ♩.=72 — 가까이
 PROG7 = [("Dm7", 6), ("Bbmaj7", 6), ("Gm7", 6), ("Ebmaj7", 6),
          ("Dm7", 6), ("Cm7", 6), ("Bb6", 6), ("Ebmaj7", 6),
          ("Dm11", 6), ("F", 6), ("Gm7", 6), ("Ebmaj7", 6),
          ("Bbmaj7", 6), ("Cm7", 6), ("Ebmaj7", 6), ("Dm7", 6)]
-t = 325.0
 prev = LAST
 bar = 0
 END7 = 425.0                                  # 악장 경계. 넘기면 8악장을 덮는다
-while t < END7:
+for _s0, _s1, BT in TEMPO7:
+  t = _s0
+  while t < _s1:
     tn, prev, ts = lay_chords(PROG7, t, BT, 52, 72, pf=0.0, org=0.20, strg=0.10,
-                              prev=prev, roll=0.0, hold=0.99, until=END7)
+                              prev=prev, roll=0.0, hold=0.99, until=_s1)
     # 알함브라의 물 — 6/8 아르페지오 (피아노)
     bt = t
     for i, (sym, beats) in enumerate(PROG7):
-        if bt >= END7:
+        if bt >= _s1:
             break
         v = voice_lead(sym, None, 57, 79, 4)
         pat = [0, 1, 2, 3, 2, 1]
@@ -592,7 +640,34 @@ mark("8악장 바르셀로나 · 7/8 (2+2+3) · 인스트루멘털 브레이크"
 #      마디 4~7    드럼 주도      오르간은 스탭. 탐으로 굴린다
 #      마디 8~11   무그           주제 B 파편 + **비명** (`07` 14장이 여기로 정했다)
 #      마디 12~15  총주           전부. 크래시
-BT = 60 / 216.0
+# BL-33 (`07` 19장) — **곡의 정점은 자기 안에서 오른다.**
+#
+# v3.4 에서 ♪=176 → 216 으로 올렸는데 검수자 판정은 "뭔가 아쉽다"였다.
+# 빠르기는 맞았지만 **고정값 하나를 더 박은 것**이라 극적이지 않았다.
+# 지적은 세 번 다 "곡 전체"를 가리켰는데 나는 세 번 다 한 곳을 고쳤다.
+#
+# 여기서 세는 ♩은 4분음표가 아니라 **2+2+3 의 그룹 맥박**이다. 마디에 셋.
+# 마디 길이 = 180/P 초이고 8분음표는 그 1/7 이다.
+#   P= 88  마디 2.045초   16마디  425.0 → 457.7
+#   P=104  마디 1.731초   20마디  457.7 → 492.3
+#   P=120  마디 1.500초   끝까지  492.3 → 525.0
+#
+# 16·20 마디로 끊은 것은 **역할 회전(4마디)의 배수**여서다. 템포가 오르는
+# 순간이 주역이 바뀌는 순간과 겹쳐야 계단이 들린다.
+TEMPO8 = [(16, 180 / 88.0 / 7), (20, 180 / 104.0 / 7), (10 ** 9, 180 / 120.0 / 7)]
+
+
+def bt8(nbar):
+    """마디 번호로 8분음표 길이를 준다. 누적 마디 수로 단계를 고른다."""
+    acc = 0
+    for n, bt in TEMPO8:
+        acc += n
+        if nbar < acc:
+            return bt
+    return TEMPO8[-1][1]
+
+
+BT = bt8(0)
 # 마디마다 두 화음. 4+3 이 2+2+3 의 그룹 경계와 맞는다
 PROG8 = [("Dm", 4), ("Ebmaj7", 3), ("Dm", 4), ("Cm7", 3),
          ("Bbmaj7", 4), ("D", 3), ("Dm", 4), ("Gm7", 3),
@@ -616,12 +691,13 @@ while t < END8:
         if t >= END8:
             break
         role = ("org", "drum", "moog", "tutti")[(bar // 4) % 4]
+        BT = bt8(bar)                       # BL-33 — 마디마다 단계를 다시 묻는다
         # 한 마디 = 두 화음 (4박 + 3박). 화성 리듬이 옛 판의 두 배다
         off = 0.0
         for sym, nb in PROG8[ci:ci + 2]:
             v = voice_lead(sym, prev, 52, 71, 4)
             prev = v
-            CHORDLOG.append((t + off, sym, tuple(v)))
+            clog(t + off, sym, v)
             # 오르간 — 역할에 따라 길이가 다르다. 스탭이면 짧게 끊는다
             hold = {"org": 0.86, "drum": 0.30, "moog": 0.55, "tutti": 0.90}[role]
             og = {"org": 0.66, "drum": 0.42, "moog": 0.38, "tutti": 0.82}[role]
@@ -861,3 +937,6 @@ for n, tt in MARK:
 
 np.save("chordlog.npy", np.array([(a, b, c) for a, b, c in CHORDLOG], dtype=object),
         allow_pickle=True)
+# 악장 번호는 **별도 파일**이다. chordlog.npy 의 모양을 바꾸면
+# 자막생성.py·검증화성.py 가 함께 깨지므로 건드리지 않는다.
+np.save("chordmov.npy", np.array(CHORDMOV, dtype=np.int16))
