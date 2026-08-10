@@ -934,7 +934,9 @@ print("  평균 총이동량      %.2f 반음 / 화음전환 (4성부 합)" %
 print("  외성 병행 5도      %d" % STAT["par5"])
 print("  외성 병행 8도      %d" % STAT["par8"])
 print("  7반음 초과 도약    %d" % STAT["leap"])
-print("  저역 밀집(5도미만) %d" % STAT["lowtight"])
+# 조건은 화성.py:157 — `best[i] < 56 and best[i+1] - best[i] < 5`.
+# **5반음 미만 = 완전4도 미만이다.** 「5도미만」으로 찍고 있었다 (`05` 9.22.5절).
+print("  저역 밀집(4도 미만) %d" % STAT["lowtight"])
 print()
 for n, tt in MARK:
     print("  %5.1fs  %d:%02d  %s" % (tt, int(tt) // 60, int(tt) % 60, n))
