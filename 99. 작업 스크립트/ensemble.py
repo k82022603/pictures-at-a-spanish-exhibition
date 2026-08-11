@@ -136,6 +136,97 @@ def nylon(midi, dur, vel=0.7, pluck=0.22, damp=0.996, ring=0.8):
     return y
 
 
+
+def flamenco(midi, dur, vel=0.7, pluck=0.14, damp=0.996, ring=0.34, nail=1.0):
+    """플라멩코 기타. `nylon()` 과 **세 곳**이 다르다 — 밝기 · 손톱 · 몸통.
+
+    **2026-08-11 검수자 판정 — "내 귀에는 가야금 뜯는 소리로 들림."**
+
+    맞는 지적이었고 원인이 셋이었다.
+
+    ① **여기 신호를 4.5kHz 에서 잘라** 어두웠다 → **9kHz 까지 연다.**
+       플라멩코는 손가락 살이 아니라 **손톱**으로 친다.
+    ② **어택에 손톱 소리가 없었다** → 3ms 짜리 광대역 「긁힘」을 더한다.
+    ③ **몸통 공명이 약했다**(0.16 / 0.11 / 0.07) → **두 배로 올리고 한 모드 더.**
+
+    **줄만 있고 몸통과 손톱이 없으면 「판에 얹힌 줄」이 된다. 가야금이 실제로
+    그런 악기다** — 공명통이 얕고 뜯는 소리가 그대로 난다. 진단이 정확했다.
+
+    `nylon()` 은 그대로 둔다 — 2악장은 클래식 주법이고 그쪽은 이 소리가 아니다.
+    """
+    key = ("fla", midi, round(dur, 3), round(vel, 2), round(pluck, 2), round(ring, 2))
+    if key in _GCACHE:
+        return _GCACHE[key]
+
+    f0 = midi2f(midi)
+    N = max(3, int(round(SR / f0)) - 1)
+    n = _ns(dur + ring)
+    rng = np.random.default_rng(midi * 337 + int(vel * 100) + 7)
+
+    # ① 여기 신호 — 손톱이라 훨씬 밝다 (나일론은 f0*7 · 상한 4.5kHz)
+    exc = rng.uniform(-1, 1, N)
+    fc = float(np.clip(f0 * 14.0, 900.0, 9000.0))
+    exc = signal.lfilter(*signal.butter(2, fc / (SR / 2), btype="low"), exc)
+    pp = max(1, int(N * pluck))                 # 뜯는 위치 — 브리지 쪽
+    exc = exc - np.concatenate([np.zeros(pp), exc[:-pp]])
+
+    x = np.zeros(n)
+    x[:N] = exc
+    tau = 1.0 + 2.6 * np.exp(-f0 / 200.0)       # 나일론보다 조금 짧다. 타악적이다
+    d = float(np.clip(damp * np.exp(-1.0 / (tau * f0)), 0.0, 0.9995))
+    a = np.zeros(N + 3)
+    a[0] = 1.0
+    a[N] = -d * 0.25
+    a[N + 1] = -d * 0.50
+    a[N + 2] = -d * 0.25
+    y = signal.lfilter([1.0], a, x)
+
+    # ③ 몸통 — 헬름홀츠 · 상판 · 고차 모드. 나일론의 약 두 배
+    for fc2, q2, g in [(98, 9.0, 0.30), (203, 7.0, 0.24),
+                       (430, 5.5, 0.16), (620, 4.5, 0.10)]:
+        b, a2 = signal.iirpeak(fc2 / (SR / 2), q2)
+        y += g * signal.lfilter(b, a2, y)
+
+    # ② 손톱 — 줄에 걸려 긁히는 3ms. **이것이 「기타다」를 만든다**
+    if nail > 0:
+        nl = _ns(0.006)
+        cl = rng.uniform(-1, 1, nl) * np.exp(-np.arange(nl) / (SR * 0.0011))
+        cl = signal.lfilter(*signal.butter(2, 2600 / (SR / 2), btype="high"), cl)
+        y[:nl] += 0.42 * nail * cl
+
+    y = signal.lfilter(*signal.butter(2, 11000 / (SR / 2), btype="low"), y)
+
+    m = np.abs(y).max()
+    if m > 0:
+        y = y / m
+    e = np.ones(n)
+    r0 = _ns(dur)
+    if r0 < n:
+        e[r0:] = np.exp(-np.arange(n - r0) / (SR * max(ring, 0.05) * 0.35))
+    y *= e * vel * 0.55
+    _GCACHE[key] = y
+    return y
+
+
+def golpe(vel=0.8):
+    """골페 — 기타 **상판을 손가락으로 두드린다.** 플라멩코 특유의 타격.
+
+    카혼과 다르다. 카혼은 상자를 치는 저역 붐이고, 골페는 **기타 몸통**이
+    울리는 소리다 — 그래서 이 소리가 있으면 **「저기 기타가 있다」가 확실해진다.**
+    """
+    n = _ns(0.16)
+    rng = np.random.default_rng(90911)
+    x = rng.uniform(-1, 1, n) * np.exp(-np.arange(n) / (SR * 0.012))
+    y = np.zeros(n)
+    for fc, q2, g in [(92, 7.0, 1.00), (190, 6.0, 0.55), (410, 4.0, 0.22)]:
+        b, a = signal.iirpeak(fc / (SR / 2), q2)
+        y += g * signal.lfilter(b, a, x)
+    cl = rng.uniform(-1, 1, n) * np.exp(-np.arange(n) / (SR * 0.0018))
+    y += 0.35 * signal.lfilter(*signal.butter(2, 2200 / (SR / 2), btype="high"), cl)
+    m = np.abs(y).max()
+    return (y / m * vel * 0.50) if m > 0 else y
+
+
 # ═══════════════════════════════════════ 팔마스 · 카혼 (WBS 1.1.5)
 def palma(vel=0.8, kind="clara"):
     """플라멩코 박수. clara = 손바닥 마주쳐 날카롭게, sorda = 오므려 둔탁하게."""

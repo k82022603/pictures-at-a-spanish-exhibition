@@ -697,6 +697,14 @@ def ny(m, dur, vel=0.6, **kw):
     return ens.nylon(int(m), q(dur, 0.03), vel=q(vel, 0.05), **kw)
 
 
+def fla(m, dur, vel=0.6, **kw):
+    """플라멩코 기타 캐시 래퍼. `ny` 와 같은 규칙이다 (BL-30 — 씨앗 고정)."""
+    _cap(ens._GCACHE, 260)
+    if "ring" in kw:
+        kw["ring"] = q(kw["ring"], 0.1)
+    return ens.flamenco(int(m), q(dur, 0.03), vel=q(vel, 0.05), **kw)
+
+
 def rick(m, d, vel=0.75, ring=0.55):
     _cap(_RC, 320)
     k = (int(m), q(d, 0.03), q(vel, 0.05), q(ring, 0.15))

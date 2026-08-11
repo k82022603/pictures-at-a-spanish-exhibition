@@ -16,7 +16,7 @@ from scipy import signal as sg
 import piano
 import ensemble as ens
 import synth
-from 화성 import (Desk, voice_lead, bassline, parse, pcset, STAT,
+from 화성 import (Desk, voice_lead, bassline, parse, pcset, STAT, fla,
                   rick, hamm, moog, tape, pn, st, ny,
                   drum, lay_drum, pat_promenade, pat_finale, pat_break)
 
@@ -97,7 +97,7 @@ def mark(name, t, seed=None):
 # ══════════════════════════════════════════════════ 공통 텍스처 함수
 def lay_chords(prog, t0, beat, lo, hi, *, org=0.0, pf=0.0, strg=0.0, gtr=0.0,
                nv=4, roll=0.016, pan=-0.10, sus=None, prev=None, hold=0.96,
-               until=None):
+               until=None, gtr_oct=0):
     """화성 진행을 놓는다. 반환 (끝 시각, 마지막 보이싱, 각 화음 시각 리스트)
 
     `until` — 이 시각을 넘는 화음은 놓지 않는다. **악장 경계다.**
@@ -130,7 +130,9 @@ def lay_chords(prog, t0, beat, lo, hi, *, org=0.0, pf=0.0, strg=0.0, gtr=0.0,
                 D["str"].put(st(m, dur, strg * vv, voices=6, attack=0.30,
                                 release=0.55, section="low"), tt, 1.0, sp * 1.6)
             if gtr > 0:
-                D["gtr"].put(ny(m, dur * 0.7, gtr * vv, pluck=0.16,
+                # gtr_oct — **기타만** 옥타브를 옮긴다 (2026-08-11 시청용).
+                # 화음은 그대로 두고 기타 층만 올리므로 피아노·현악과 어긋나지 않는다.
+                D["gtr"].put(ny(m + gtr_oct, dur * 0.7, gtr * vv, pluck=0.16,
                                 ring=min(1.4, beats * beat)), tt, 1.0, -sp)
         # 지속음(sus4 → 3음) 처리: 지정된 인덱스에서 4도를 먼저, 3도를 뒤에
         t += beats * beat
@@ -391,22 +393,22 @@ for _rep in range(2):                                  # 15초를 채운다
     _t2 = 90.0 + _rep * 15 * BT
     if _t2 >= END2:
         break
-    lay_bass(PROG2, _t2, BT, BB_MAJ, gain=0.96, density=2.0, leap_p=0.13,
+    lay_bass(PROG2, _t2, BT, BB_MAJ, gain=0.917, density=2.0, leap_p=0.13,
              seed=22 + _rep, until=END2)               # 걷는 몸
-    _tn2, _p2, _ = lay_chords(PROG2, _t2, BT, 50, 68, gtr=0.30, strg=0.08,
+    _tn2, _p2, _ = lay_chords(PROG2, _t2, BT, 50, 68, gtr=0.286, strg=0.076,
                               org=0.12, pf=0.16, prev=_p2, roll=0.030, until=END2)
     for _sym, _nb2 in PROG2:                           # 드럼 — 3박 마디
         if _t2 >= END2:
             break
         lay_drum(lambda y, a, g, p: D["drum"].put(y, a, g, p),
-                 _t2, BT, pat_promenade(_nb2, _n2), gain=0.62,
+                 _t2, BT, pat_promenade(_nb2, _n2), gain=0.592,
                  n=_n2, jitter=lambda a, v: H(a, v))
         _t2 += _nb2 * BT
         _n2 += 1
 # 두 번째 발소리 — 기타 캐논. 이 악장의 정체다
-lay_line(TH_A, 90.0, BT, inst="gtr", vel=0.62, ring=1.1, pan=0.18)
+lay_line(TH_A, 90.0, BT, inst="gtr", vel=0.592, ring=1.1, pan=0.18)
 lay_line([(m, b) for m, b in TH_A[:8]], 90.0 + 2 * BT, BT, inst="gtr",
-         vel=0.34, ring=1.1, oct_=-12, pan=-0.26)
+         vel=0.325, ring=1.1, oct_=-12, pan=-0.26)
 LAST = _p2
 
 # ═════════════════════════════════════════════════ 3악장 · 세고비아 (1:45–2:40)
@@ -452,6 +454,42 @@ TEMPO4 = [76, 84, 96]                        # 단위 ♩ · BB 는 8분음표 =
 BB = 30.0 / TEMPO4[0]                        # 들머리는 가장 느린 단계
 CAD = [("Gm7", 3), ("F/A", 3), ("Ebmaj7", 3), ("Dphr", 3)]
 ACC = {0, 3, 6, 8, 10}
+# ── 라스게아도 세기 등급 (2026-08-11) ────────────────────────────────
+#
+# **강약이 두 단계뿐이었다** — 강세 0.50 · 약박 0.24, 곧 6.4 dB 차이 하나.
+# 자리는 맞았다(`ACC` 가 12·3·6·8·10 인 솔레아 컴파스 그대로다). **세기만
+# 없었다.** 그래서 굴림을 넣었을 때 네 번이 거의 같은 세기로 나가 시끄럽기만
+# 했다 — **형태 없는 굴림은 굴림이 아니라 소음이다.**
+#
+# `bi=0` 이 12박이다. 네 등급으로 나눈다.
+#   강      3 · 10        솔레아의 두 기둥
+#   중      12 · 6 · 8    나머지 강세
+#   약      1 · 4 · 7 · 11  강세 바로 뒤 — 여세가 남는다
+#   아주 약 2 · 5 · 9     빈 자리
+# 폭이 6.4 → **10.4 dB** 로 벌어지고 평균은 0.348 → 0.333 으로 거의 같다.
+RASG = {3: 0.56, 10: 0.56,
+        0: 0.44, 6: 0.44, 8: 0.44,
+        1: 0.26, 4: 0.26, 7: 0.26, 11: 0.26}
+RASG_MIN = 0.17
+
+# ── 아르페지오 음형 (2026-08-11 · 「가」 안 · 변주 추가) ──────────────
+#
+# **검수자 — "아랑훼즈 협주곡, 스페인 무곡 수준의 연주가 나와야 함."**
+#
+# 합성으로 그 수준은 못 간다. 다만 **여기 기타에는 음형이 없었다** — 화음
+# 덩어리를 박마다 한 번 긁을 뿐이라 **칠 것이 없었다.** 아랑훼즈·안달루사는
+# **아르페지오가 곧 악기의 노래**다.
+#
+# 숫자는 성부 번호(0=최저 … 3=최상). 등급마다 두 벌이고, **밀도가 오른 뒤
+# (lvl≥2) 컴파스마다 번갈아** 쓴다 — 같은 음형이 스무 번 반복되면 기계가 된다.
+# 둘째 벌의 「강」이 **트레몰로**다(윗음을 세 번 되풀이하고 엄지가 저음을 짚는
+# 것 — 〈알함브라 궁전의 추억〉의 그 음형).
+FIG = {
+    "강":   [(0, 3, 2, 3), (0, 3, 3, 3)],      # 둘째가 트레몰로
+    "중":   [(0, 2, 3, 2), (0, 3, 2, 1)],
+    "약":   [(1, 2, 3, 2), (2, 3, 1, 2)],
+    "약약": [(2, 3, 2, 3), (3, 2, 3, 2)],
+}
 # BL-25 — 밀도 단계(lvl)별로 베이스가 앉는 자리. 강세 자리 ACC 의 부분집합이다.
 BASS4 = {0: {0, 10},            # 컴파스의 두 극점만. 아직 듣고만 있다
          1: {0, 6, 10},         # E♭ 이 붙는다
@@ -503,13 +541,24 @@ while t < 254.0:
         v = voice_lead(sym, prev, 46, 71, 4, par_pen=0.0, plane=30.0)
         prev = v
         clog(t, sym, v)
+        # 기타 음형을 **먼저 모으고 나중에 낸다.** 길이를 정하려면 다음에
+        # 같은 음이 언제 다시 울리는지 알아야 하기 때문이다 (아래 참조).
+        gev = []
         for b in range(nb):
             bi = ci * 3 + b
             hard = bi in ACC
-            # 라스게아도 — 기타가 화성을 낸다
-            for j, m in enumerate(v):
-                tt, vv = H(t + j * 0.009, (0.50 if hard else 0.24) * (0.6 + 0.15 * lvl))
-                D["gtr"].put(ny(m, BB * 0.9, vv, pluck=0.14, ring=0.34), tt, 1.0, 0.22)
+            grade = ("강" if bi in (3, 10) else
+                     "중" if bi in (0, 6, 8) else
+                     "약" if bi in (1, 4, 7, 11) else "약약")
+            var = 1 if (lvl >= 2 and comp % 2 == 1) else 0
+            g0 = RASG.get(bi, RASG_MIN) * (0.6 + 0.15 * lvl)
+            sub = BB / 4.0
+            for k, idx in enumerate(FIG[grade][var]):
+                gev.append((t + k * sub, idx,
+                            g0 * (1.0 if k == 0 else (0.62 if k % 2 else 0.74))))
+            # 팔마스 — **세기는 기타와 따로 정한다.**
+            # 2026-08-11: 음형을 넣으면서 이 줄을 지웠다가 팔마스가 기타
+            # 세기로 울리고 있었다. 되살린다.
             tt, vv = H(t, 0.58 if hard else 0.24)
             D["perc"].put(ens.palma(vv, "clara" if hard else "sorda"), tt, 1.0, -0.40)
             if hard:
@@ -528,6 +577,24 @@ while t < 254.0:
             if bi == 10 and lvl >= 2:
                 D["perc"].put(ens.tacon(0.62), H(t, 1.0)[0], 1.0, -0.14)
             t += BB
+        # ── 현끼리 부딪히는 것 (2026-08-11 검수자 지적) ──────────────
+        #
+        # **같은 음을 다시 뜯을 때 앞의 것을 안 죽이고 있었다.** 실제 기타는
+        # 같은 줄을 다시 치면 앞 진동이 그 자리에서 멈춘다. 그런데 여기서는
+        # 앞 음이 0.9박 + 여운을 그대로 들고 있는 채로 같은 음이 또 들어와,
+        # **같은 높이의 두 소리가 위상만 다르게 겹쳐 웅웅거렸다.**
+        #
+        # 그래서 **다음에 그 음이 다시 울릴 때까지**로 길이를 잡는다. 다시
+        # 안 울리면(화음의 마지막 등장) 그때만 길게 남겨 다음 화음으로 넘긴다.
+        for n, (et, idx, amp) in enumerate(gev):
+            nxt = next((gev[m][0] for m in range(n + 1, len(gev))
+                        if gev[m][1] == idx), None)
+            cut = nxt is not None
+            dur = (nxt - et - 0.006) if cut else BB * 1.15
+            dur = float(np.clip(dur, BB * 0.35, BB * 1.4))
+            tt, vv = H(et, amp)
+            D["gtr"].put(fla(v[idx], dur, vv, pluck=0.14,
+                             ring=0.10 if cut else 0.34), tt, 1.0, 0.22)
     if lvl >= 1 and comp % 3 == 0:
         lay_line(TH_B, t - 12 * BB, 60 / 112.0, inst="gtr", vel=0.62, ring=1.0, pan=0.10)
     if lvl >= 2 and comp % 3 == 1:
@@ -598,12 +665,12 @@ BT = 60 / 100.0
 # 없다** — 같은 넷을 5+6 으로 묶었을 뿐이다.
 PROG5 = [("Gm7", 5), ("Ebmaj7", 6), ("Cm7", 5), ("D7b9", 6), ("D7b9", 3)]
 PROG5_CH = [("Gm7", 5), ("Ebmaj7", 6), ("Cm7", 5), ("D7b9", 6)]
-lay_bass(PROG5, 260.0, BT, D_PHR, gain=0.98, density=2.0, leap_p=0.20, seed=51,
+lay_bass(PROG5, 260.0, BT, D_PHR, gain=0.947, density=2.0, leap_p=0.20, seed=51,
          bar_every=2)
-lay_chords(PROG5_CH, 260.0, BT, 51, 70, pf=0.34, strg=0.14, org=0.20,
+lay_chords(PROG5_CH, 260.0, BT, 51, 70, pf=0.328, strg=0.135, org=0.193,
            prev=LAST, roll=0.020)
-lay_line(TH_A, 260.0, BT, vel=0.60, ring=1.5, oct_=12, pan=-0.24)
-lay_line(TH_B, 260.0 + 1.5 * BT, BT, vel=0.50, ring=1.5, pan=0.22)
+lay_line(TH_A, 260.0, BT, vel=0.580, ring=1.5, oct_=12, pan=-0.24)
+lay_line(TH_B, 260.0 + 1.5 * BT, BT, vel=0.483, ring=1.5, pan=0.22)
 LAST = voice_lead("D7b9", None, 51, 70, 4)
 
 # ═════════════════════════════════════════════════ 6악장 · 론다 (4:35–5:25)
@@ -650,13 +717,21 @@ while t < 320.0:
     # 처음에 0.35/0.10/0.09 로 내렸더니 폭이 **7.2 dB 로 상한(7.0)을
     # 넘었다**(`05` 9.14절). 상한은 사흘 전에 근거를 세운 값이라 오늘
     # 열지 않는다 — 대신 여기를 되돌렸다.
-    tn, prev, ts = lay_chords(PROG6, t, BT, 55, 74, pf=0.375, strg=0.105, org=0.094,
+    # BL-34 ④ 재작업 (2026-08-11) — **정점을 올리지 않고 조용한 악장을 내린다.**
+    # 마스터 컴프레서 문턱은 전곡 72 백분위, 테이프 드라이브는 전곡 피크다.
+    # **조용한 악장은 문턱 아래라 선형으로 지나간다** — 내린 만큼 그대로
+    # 내려가고, 문턱도 피크도 안 움직인다. 올리는 쪽은 반대로 자기를 깎는다.
+    #
+    # **실측으로 확인됐다** — 이 조정 뒤 8·9악장이 소수점까지 불변이고
+    # 9:26 해소도 0.397 그대로다. 올리는 방식에서 무너진 둘이 안 움직였다.
+    # 첫 판이 −0.8 dB 로 과해 폭이 7.2(상한 7.0 초과)가 나와 0.2 되돌렸다.
+    tn, prev, ts = lay_chords(PROG6, t, BT, 55, 74, pf=0.358, strg=0.100, org=0.090,
                               prev=prev, roll=0.042, hold=0.97, nv=4)
     for b0, m, bd, bv in BASS6:
-        tt, vv = H(t + b0 * BT, bv)
+        tt, vv = H(t + b0 * BT, bv * 0.955)          # ④ 재작업 −0.6 dB
         D["bass"].put(rick(m, bd * BT * 0.94, vel=vv, ring=2.6), tt, 1.0, -0.04)
     # 피아노는 앞 절반만 든다. 뒷 절반은 베이스에게 넘긴다
-    lay_line(MEL6[:4], t + 2 * BT, BT, vel=0.60, ring=2.6, oct_=0, pan=-0.20)
+    lay_line(MEL6[:4], t + 2 * BT, BT, vel=0.573, ring=2.6, oct_=0, pan=-0.20)
     # ── 그녀가 나란히 걷는다 (WBS 1.4.5, `07` 22장) ──────────────────
     #
     # `03` 4·5장이 요구한 것 — **"두 주제 3도 병행 = 협화. 익숙해졌다."**
@@ -677,7 +752,7 @@ while t < 320.0:
     # 고정하면 E♮·C♯ 이 나오므로(음집합 밖) **음집합 안에서 10도를 고른다.**
     for (b0, m, bd, bv), up in zip(BASS6[2:6], (63, 62, 63, 67)):
         tt, vv = H(t + b0 * BT, 0.30)
-        D["str"].put(st(up, bd * BT * 0.96, 0.11 * vv / 0.30, voices=6,
+        D["str"].put(st(up, bd * BT * 0.96, 0.1054 * vv / 0.30, voices=6,
                         attack=0.55, release=2.2), tt, 1.0, 0.30)
     t = tn
 LAST = prev
