@@ -73,10 +73,19 @@ def pcset(sym):
 # 좋은 화성은 화음의 선택이 아니라 성부의 이동에서 나온다.
 # 후보 보이싱을 모두 만들고 벌점이 가장 낮은 것을 고른다.
 
-STAT = {"chords": 0, "move": 0.0, "par5": 0, "par8": 0, "lowtight": 0, "leap": 0}
+# par5_ok · par8_ok 는 **허용 구간에서 난 병행**이다 (BL-34 ①, 2026-08-11).
+# 사고로 난 병행과 같은 칸에 넣으면 판정이 죽는다 — 「0건」이 통과 기준인데
+# 허용분이 섞여 들어오면 그 기준이 아무것도 안 재게 된다.
+#
+# `lowtight_ok` 도 같다. **저역 밀집 기준(최저 두 성부가 4도 미만)도 건반
+# 화성학에서 온 것**이고, 4악장에서 소리를 내는 것은 피아노가 아니라 **기타**다.
+# 쓸어 치는 기타 화음은 원래 좁게 붙는다 — 열린 D 코드가 D A D F♯ 이다.
+# 병행과 같은 이유로 같은 자리에서 갈라 센다.
+STAT = {"chords": 0, "move": 0.0, "par5": 0, "par8": 0, "lowtight": 0, "leap": 0,
+        "par5_ok": 0, "par8_ok": 0, "lowtight_ok": 0}
 
 
-def _score(c, prev, ess_pc, third_pc, root_pc):
+def _score(c, prev, ess_pc, third_pc, root_pc, par_pen=40.0, plane=0.0):
     s = 0.0
     # (a) 성부 간격 — 저역에서 좁은 간격은 뭉친다
     for i in range(len(c) - 1):
@@ -118,16 +127,66 @@ def _score(c, prev, ess_pc, third_pc, root_pc):
     # **0건이 설계였던 것은 맞지만 여유가 없었다.** 16.0 은 "웬만하면
     # 피한다"이지 "하지 않는다"가 아니다. 이동량이 큰 전환에서는 뒤집힌다.
     # 40.0 이면 어지간한 이동량 차이로는 못 이긴다.
+    #
+    # **BL-34 ① (2026-08-11) — `par_pen` 으로 열었다. 기본값은 그대로다.**
+    # 이 금지는 18세기 화성학 시험 채점 기준이고 **4악장에서는 틀렸다.**
+    # 플라멩코 라스게아도는 병행 화음으로 움직이는 것이 어법인데, 이 벌점이
+    # 그 악장을 스페인 음악이 아니게 만들고 있었다 (`08` 11.4절).
+    #
+    # **벌점을 빼는 것만으로는 안 된다 — 실측으로 확인했다.**
+    # `par_pen=0` 만 주면 병행 5도는 **0건**이고 병행 8도 7건에 보이싱은
+    # 화음 하나만 바뀐다. 총이동량은 오히려 6.43 → 6.48 로 는다.
+    # 처음에 "공통음이 없으니 최소 이동이 곧 평행"이라고 봤는데 틀렸다 —
+    # (e) 이동량과 (h) 공통음 보상이 만드는 최적해는 평행이 아니다.
+    #
+    # 그래서 `plane` 으로 **평행을 보상**한다. 아래 (g2) 를 볼 것.
+    #
+    # **음집합은 안 깨진다** — 후보(`cands`)가 애초에 그 화음의 화음음뿐이다.
     i0, i1 = (prev[-1] - prev[0]) % 12, (c[-1] - c[0]) % 12
     if i0 == i1 and i0 in (0, 7) and c[0] != prev[0]:
-        s += 40.0
+        s += par_pen
+    # (g2) 평행 이동 보상 — 라스게아도 (BL-34 ①, 2026-08-11)
+    #
+    # **윗 성부들이 같은 간격으로 움직일 때 준다.** 기타가 왼손 모양을 유지한
+    # 채 미끄러지는 것이고, 플라멩코 종지의 소리가 이것이다.
+    #
+    # **왜 「전부」가 아니라 「윗줄」인가** — 네 성부를 통째로 옮기면서 품질음을
+    # 다 지키는 것이 이 진행에서는 **불가능**하다. Gm7·E♭maj7 이 7화음이라
+    # 성질이 서로 다르기 때문이다(플라멩코 원형인 Am–G–F–E 는 전부 3화음이라
+    # 통째로 옮겨진다). 실측으로 확인했다 — 「전부」로 걸면 평행이 0 이 되거나,
+    # 품질음을 버려야 평행이 난다.
+    #
+    # 실제 라스게아도도 그렇다. **윗줄이 평행하게 미끄러지고 맨 아래는 따로**
+    # 움직인다. 그래서 최저 성부를 풀어 주고, 그 성부가 빠질 뻔한 품질음을
+    # 메우게 한다.
+    #
+    # **품질음이 다 있을 때만 준다.** 이 가드가 없으면 보상이 품질음 누락
+    # 벌점(30)을 이겨서 **화음의 정체를 버리고 모양을 지킨다.** 2026-08-11
+    # 첫 렌더가 그랬다 — 4악장 종지 Dphr 이 `[54,63,66,69]`(F♯ **E♭** F♯ A)
+    # 에서 `[50,57,62,66]`(D A D F♯) 이 되면서 **프리지안 ♭2 인 E♭ 이
+    # 빠졌다.** 그 음이 플라멩코 종지를 플라멩코로 만드는 음이다.
+    # **음집합은 안 깨졌지만 화음의 성격이 깨졌다.**
+    #
+    # 후보가 화음음뿐이므로 **음집합 밖으로는 애초에 못 간다.**
+    if plane > 0.0 and len(c) >= 3 and all(e in pres for e in ess_pc):
+        d0 = c[1] - prev[1]
+        if d0 != 0 and all(a - b == d0 for a, b in zip(c[1:], prev[1:])):
+            s -= plane
     # (h) 공통음 유지 보상
     same = sum(1 for a in c if a in prev)
     s -= 1.6 * same
     return s
 
 
-def voice_lead(sym, prev=None, lo=50, hi=71, nv=4):
+def voice_lead(sym, prev=None, lo=50, hi=71, nv=4, par_pen=40.0, plane=0.0):
+    """par_pen — 외성 병행 5도·8도 벌점. **기본값을 넘기지 않으면 예전과 같다.**
+
+    `par_pen=0.0` 은 그 화음에서 병행을 허용한다는 뜻이고, 그때 나는 병행은
+    `STAT["par5_ok"]`·`par8_ok` 로 따로 센다 (BL-34 ①).
+
+    plane — 네 성부가 **전부 같은 간격으로** 움직일 때 주는 보상. 라스게아도다.
+    `par_pen` 을 푸는 것만으로는 평행이 안 나온다는 것을 실측으로 확인했다.
+    """
     root, degs, _ = parse(sym)
     pcs = sorted({(root + d) % 12 for d in degs})
     ess = [(root + d) % 12 for d in essential(degs)]
@@ -137,7 +196,7 @@ def voice_lead(sym, prev=None, lo=50, hi=71, nv=4):
         nv = len(cands)
     best, bs = None, 1e18
     for c in itertools.combinations(cands, nv):
-        s = _score(list(c), prev, ess, third, root)
+        s = _score(list(c), prev, ess, third, root, par_pen, plane)
         if s < bs:
             bs, best = s, list(c)
     # 통계
@@ -146,16 +205,18 @@ def voice_lead(sym, prev=None, lo=50, hi=71, nv=4):
         STAT["move"] += sum(abs(a - b) for a, b in zip(best, prev))
         i0, i1 = (prev[-1] - prev[0]) % 12, (best[-1] - best[0]) % 12
         if i0 == i1 and best[0] != prev[0]:
+            ok = "_ok" if par_pen <= 0.0 else ""      # 허용 구간인가
             if i0 == 7:
-                STAT["par5"] += 1
+                STAT["par5" + ok] += 1
             elif i0 == 0:
-                STAT["par8"] += 1
+                STAT["par8" + ok] += 1
         for a, b in zip(best, prev):
             if abs(a - b) > 7:
                 STAT["leap"] += 1
+    tight = "lowtight_ok" if plane > 0.0 else "lowtight"
     for i in range(len(best) - 1):
         if best[i] < 56 and best[i + 1] - best[i] < 5:
-            STAT["lowtight"] += 1
+            STAT[tight] += 1
     return best
 
 
