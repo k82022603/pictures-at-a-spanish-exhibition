@@ -588,6 +588,15 @@ def _reverb(x, seed=0):
     return signal.lfilter(b, aa, y) * 0.5
 
 
-def write_wav(path, stereo):
-    from scipy.io import wavfile
-    wavfile.write(path, SR, (np.clip(stereo, -1, 1) * 32767).astype(np.int16))
+def write_wav(path, stereo, bits=32):
+    """**`piano.write_wav` 를 부른다. 여기 사본을 두지 않는다.**
+
+    2026-08-12 에 마스터를 32비트로 올리면서 `piano.write_wav` 만 고쳤는데,
+    **여기 똑같은 것이 하나 더 있었다** — `(x * 32767).astype(np.int16)`.
+    아무도 안 부르고 있어서 사고는 안 났지만, **다음에 누가 이걸 부르면
+    마스터가 조용히 16비트로 떨어진다.**
+
+    같은 일을 두 곳에 적으면 반드시 어긋난다 (`11. 공용 함수`).
+    """
+    import piano
+    return piano.write_wav(path, stereo, bits=bits)

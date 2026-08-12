@@ -163,6 +163,27 @@ class Score:
         return np.stack([L / m * peak, R / m * peak], axis=1)
 
 
-def write_wav(path, stereo):
+def write_wav(path, stereo, bits=32):
+    """마스터를 쓴다.
+
+    **기본이 32비트 float 다** (2026-08-12, 검수자 "24bit 올릴 방법은? 더 높여도 좋고").
+
+    믹스는 내부적으로 float32 이므로 **float 로 쓰면 양자화가 아예 없다** —
+    24비트 정수보다도 정확하다. 스템은 `Desk.save_stems` 가 이미 float32 로
+    쓰고 있었고, **최종 마스터만 16비트로 떨어뜨리고 있었다.**
+
+    옛 경로에 결함이 하나 더 있었다 — `(x * 32767).astype(np.int16)` 은
+    **반올림이 아니라 0 쪽으로 자른다.** 잘라낸 오차는 신호와 상관을 갖기
+    때문에 같은 크기의 무작위 잡음보다 나쁘다. float 로 가면 사라진다.
+
+    bits=16 은 옛 동작을 남긴 것이다(반올림으로 고쳤다). 지우지 않는다.
+    """
     from scipy.io import wavfile
-    wavfile.write(path, SR, (np.clip(stereo, -1, 1) * 32767).astype(np.int16))
+    x = np.clip(stereo, -1.0, 1.0)
+    if bits == 16:
+        wavfile.write(path, SR, np.rint(x * 32767.0).astype(np.int16))
+    elif bits == 24:
+        # scipy 는 24비트를 못 쓴다. 32비트 정수로 쓰되 하위 8비트를 비운다
+        wavfile.write(path, SR, (np.rint(x * 8388607.0).astype(np.int32) << 8))
+    else:
+        wavfile.write(path, SR, x.astype(np.float32))

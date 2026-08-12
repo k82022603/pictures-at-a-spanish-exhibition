@@ -156,20 +156,17 @@ def main():
 
     wav = None
     if os.path.exists(WAV):
-        import scipy.io.wavfile as wf
-        _, x = wf.read(WAV)
-        wav = x.astype(np.float64) / 32768.0
-        if wav.ndim > 1:
-            wav = wav.mean(1)
+        import 화성                       # **자료형을 보고 나눈다** — 마스터가
+        _, x = 화성.read_wav(WAV)         # float32 로 바뀌자 −110 dB 를 찍었다
+        wav = x.mean(1) if x.ndim > 1 else x
 
     gains = read_gains()
     stems = {}
     for k in STEM_NAME:
         p = os.path.join(STEMS, "스템-%s.wav" % k)
         if os.path.exists(p):
-            import scipy.io.wavfile as wf
-            _, y = wf.read(p)
-            y = y.astype(np.float64)
+            import 화성
+            _, y = 화성.read_wav(p)
             y = y.mean(1) if y.ndim > 1 else y
             stems[k] = y * (10.0 ** (gains.get(k, 0.0) / 20.0))   # 페이더를 곱한다
 

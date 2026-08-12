@@ -23,8 +23,8 @@ path = sys.argv[1]
 FLOOR = float(sys.argv[2]) if len(sys.argv) > 2 else -35.0
 WIN, HOP, MINLEN = 0.10, 0.05, 0.40
 
-sr, x = wf.read(path)
-x = x.astype(np.float64) / 32768
+import 화성                        # **자료형을 보고 나눈다** (`11` 문서)
+sr, x = 화성.read_wav(path)
 if x.ndim > 1:
     x = x.mean(axis=1)
 

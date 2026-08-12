@@ -8,6 +8,8 @@
 스테레오를 다루는 방식이 달랐을 뿐이고 실제로는 불변이었다 (`05` 9.17.5절).
 """
 import sys, io, numpy as np, scipy.io.wavfile as wf
+
+import 화성
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 
 MOV = [("0 프롬나드", 0, 50), ("1 마드리드", 50, 90), ("2 변주 I", 90, 105),
@@ -16,10 +18,10 @@ MOV = [("0 프롬나드", 0, 50), ("1 마드리드", 50, 90), ("2 변주 I", 90,
        ("8 바르셀로나", 425, 525), ("9 대문", 525, 580)]
 
 a_path, b_path = sys.argv[1], sys.argv[2]
-sr, a = wf.read(a_path)
-sr, b = wf.read(b_path)
-a = a.astype(np.float64) / 32768
-b = b.astype(np.float64) / 32768
+# **자료형을 보고 나눈다** (`화성.read_wav`). 두 파일의 자료형이 **서로 달라도**
+# 된다 — 16비트 기준선과 float32 새 렌더를 대조하는 것이 실제로 있었다.
+sr, a = 화성.read_wav(a_path)
+sr, b = 화성.read_wav(b_path)
 n = min(len(a), len(b))
 
 def db(x):

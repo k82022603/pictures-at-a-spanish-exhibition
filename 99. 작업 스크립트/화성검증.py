@@ -2,6 +2,8 @@
 """전곡 화성 검증 — 크로마 · 대역 균형 · 러프니스 · 클리핑"""
 import sys
 import numpy as np
+
+import 화성
 from scipy import signal as sg
 from scipy.io import wavfile
 
@@ -14,8 +16,7 @@ MOV = [("0 프롬나드 제시", 0, 50, "Bb"), ("1 마드리드", 50, 90, "Bb"),
        ("8 바르셀로나", 425, 525, "Dm"), ("9 대문", 525, 580, "Bb")]
 
 path = sys.argv[1] if len(sys.argv) > 1 else "전곡화성.wav"
-sr, x = wavfile.read(path)
-x = x.astype(np.float64) / 32768.0
+sr, x = 화성.read_wav(path)        # 위와 같다
 mono = x.mean(axis=1)
 print("파일 %s  %.1f초  peak %.3f  RMS %.4f  DC %.2e" %
       (path, len(x) / sr, np.abs(x).max(), np.sqrt((mono ** 2).mean()), mono.mean()))

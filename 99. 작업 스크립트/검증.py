@@ -24,7 +24,9 @@ os.chdir(ROOT)
 
 # 문서 간 반드시 일치해야 하는 값 — 바뀌면 여기도 함께 고친다
 SHARED = {
-    "유효 사진 장수": "253",
+    "유효 사진 장수": "253",   # 원래 실사값. 2026-08-12 에 축소본 5장을 지워 파일은 248,
+    #                          고유 장면은 245 다. 개정 절이 00·01·02 에 있고
+    #                          본문은 원문을 남기므로(R3) 이 검사는 253 을 그대로 본다
     "총 길이": "9분 40초",
     "총 기간": "30.0",
     "PoC 비용 상한": "$20",
@@ -140,6 +142,37 @@ def main():
                 fail("스냅샷과 다름 — %s (수정 후 새 스냅샷을 남기세요)" % d)
         else:
             pass
+
+    print("\n=== 7. wav 를 읽는 코드가 자료형을 보는가 ===")
+    # **2026-08-12 사고.** 마스터를 float32 로 올렸더니 도구 여섯이 전부
+    # 악장별 RMS 를 −110 dB 로 찍었다. `/ 32768` 이 여섯 곳에 박혀 있었다.
+    #
+    # **그날 내가 돌린 확인이 거꾸로였다** — grep 패턴에 `/ 32768` 을 넣고
+    # 걸리면 「자료형 확인함」으로 찍었다. **결함 그 자체를 정상으로 보고했다.**
+    # 그래서 사람이 아니라 여기서 센다.
+    #
+    # 정당한 예외 둘 — `화성.read_wav` 본체와, `납품.py` 의 무손실 대조
+    # (거기서는 **자료형을 안 바꾼 날것**을 비교해야 한다).
+    OK_RAW = {"화성.py", "납품.py", "검증.py"}   # 검증.py 는 패턴 문자열이 자기를 문다
+    bad = []
+    for f in sorted(glob.glob("99. 작업 스크립트/*.py")):
+        base = os.path.basename(f)
+        if base in OK_RAW:
+            continue
+        src = io.open(f, encoding="utf-8").read()
+        code = "\n".join(ln for ln in src.split("\n")
+                         if not ln.lstrip().startswith("#"))
+        # 문서화 문자열 안의 언급은 세지 않는다
+        code = re.sub(r'"""[\s\S]*?"""', "", code)
+        if re.search(r"(wavfile|wf)\.read\s*\(", code):
+            bad.append("%s — `화성.read_wav` 를 쓰세요" % base)
+        if re.search(r"/\s*327(68|67)", code) and base != "piano.py":
+            bad.append("%s — `/ 32768` 이 남아 있습니다" % base)
+    if bad:
+        for b in bad:
+            fail(b)
+    else:
+        print("  OK    직접 읽는 곳 없음 — 전부 `화성.read_wav`")
 
     print("\n" + "=" * 46)
     if problems:
