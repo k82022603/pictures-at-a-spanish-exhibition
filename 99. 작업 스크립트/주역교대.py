@@ -39,6 +39,7 @@ SRC = os.path.join(HERE, "전곡화성.py")
 STEMS = os.path.join(HERE, "스템")
 
 NAME = {"kb": "피아노", "org": "해먼드", "bass": "베이스", "str": "현악",
+        "wind": "플루트",
         "gtr": "기타", "lead": "무그", "perc": "팔마스", "drum": "드럼"}
 
 # 악장 경계는 `CLAUDE.md` 6절이 정본이고 코드 네 곳이 공유한다.

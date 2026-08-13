@@ -736,6 +736,31 @@ def fla(m, dur, vel=0.6, **kw):
     return ens.flamenco(int(m), q(dur, 0.03), vel=q(vel, 0.05), **kw)
 
 
+def hps(m, dur, vel=0.6, **kw):
+    """챔발로 캐시 래퍼. `ny` · `fla` 와 같은 규칙이다 (BL-30 — 씨앗 고정).
+
+    **세기 양자화 폭을 0.05 로 두는 것이 여기서는 특히 싸다** — 챔발로는
+    세기를 거의 안 받는 악기라(`ensemble.harpsichord` 참고) 캐시 적중률이
+    피아노보다 높다.
+    """
+    _cap(ens._GCACHE, 260)
+    if "ring" in kw:
+        kw["ring"] = q(kw["ring"], 0.1)
+    return ens.harpsichord(int(m), q(dur, 0.03), vel=q(vel, 0.05), **kw)
+
+
+def flt(m, dur, vel=0.6, **kw):
+    """플루트 캐시 래퍼 (BL-36 ②). `ny` · `fla` · `hps` 와 같은 규칙이다."""
+    _cap(ens._GCACHE, 260)
+    return ens.flute(int(m), q(dur, 0.03), vel=q(vel, 0.05), **kw)
+
+
+def pic(m, dur, vel=0.6, **kw):
+    """피콜로 캐시 래퍼 (BL-36 ②). `flt` 와 같은 규칙이다."""
+    _cap(ens._GCACHE, 260)
+    return ens.piccolo(int(m), q(dur, 0.03), vel=q(vel, 0.05), **kw)
+
+
 def rick(m, d, vel=0.75, ring=0.55):
     _cap(_RC, 320)
     k = (int(m), q(d, 0.03), q(vel, 0.05), q(ring, 0.15))

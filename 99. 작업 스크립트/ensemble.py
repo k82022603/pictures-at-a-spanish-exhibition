@@ -208,6 +208,283 @@ def flamenco(midi, dur, vel=0.7, pluck=0.14, damp=0.996, ring=0.34, nail=1.0):
     return y
 
 
+def harpsichord(midi, dur, vel=0.7, pluck=0.11, damp=0.996, ring=0.30,
+                jack=1.0, four=0.30):
+    """챔발로(하프시코드). `nylon()` 에서 파생했다 — `flamenco()` 와 같은 방식이다.
+
+    **2026-08-13 검수자 지시** — *"내일은 피아노 → 챔발로 바꾸는 것 해볼게."*
+
+    **7악장 알함브라의 물에 피아노가 안 맞는 이유는 뭉치기 때문이다.** 피아노는
+    해머로 때리고 페달로 겹치는 악기라 음이 서로 녹는다. **물은 안 녹는다** —
+    한 방울 한 방울이 따로 떨어진다. 챔발로는 **깃털(플렉트럼)로 뜯는** 악기라
+    음이 안 늘어지고 또렷하게 흩어진다.
+
+    `nylon()` 과 **다섯 곳**이 다르다.
+
+    ① **여기 신호가 훨씬 밝다** — 나일론은 손가락 살(f0×7 · 상한 4.5kHz)인데
+       챔발로는 **딱딱한 깃털이 금속현을 튕긴다**(f0×22 · 상한 12kHz).
+    ② **뜯는 자리가 끝에 붙어 있다** (`pluck` 0.22 → **0.11**). 현의 끝을 뜯으면
+       기본음이 약해지고 배음이 세진다 — **챔발로의 코맹맹이 소리가 이것이다.**
+    ③ **4피트 현을 겹친다** (`four`). 챔발로는 건반 하나에 **현이 둘**인 경우가
+       많고, 둘째 현은 **한 옥타브 위**다. 이것이 「챔발로답다」의 절반이다 —
+       배음이 아니라 **진짜 다른 현**이므로 미세하게 어긋나며 반짝인다.
+    ④ **잭 소리** (`jack`). 뜯는 순간 깃털이 현을 넘어가며 나는 **「딱」**이다.
+       이것이 없으면 그냥 밝은 기타다. 플라멩코의 손톱(`nail`)과 같은 자리인데
+       **더 짧고 더 높다** — 손톱은 살이 섞이지만 깃털은 마른 소리다.
+    ⑤ **빨리 죽는다** — 금속현이지만 몸통이 얇고 현장력이 낮아 **피아노처럼
+       울리지 않는다.** `tau` 를 나일론의 절반 아래로 둔다.
+
+    **세기를 거의 안 받는다.** 챔발로는 **세게 눌러도 커지지 않는 악기**다 —
+    건반이 깃털을 밀어 올릴 뿐이고 얼마나 세게 미느냐는 거의 무관하다. 그래서
+    `vel` 을 그대로 곱하지 않고 **0.68 + 0.32·vel** 로 눌러 받는다. 셈여림이
+    사라지는 것이 아니라 **좁아진다.** 이 성질 자체가 7악장 설계와 맞는다 —
+    검수자가 *"소리 크기는 항상 같아야함 7악장 처음부터 끝까지"* 라고 했다.
+
+    `nylon()` · `flamenco()` 는 안 건드린다. 2·4악장은 이 소리가 아니다.
+    """
+    key = ("hps", midi, round(dur, 3), round(vel, 2), round(pluck, 2),
+           round(ring, 2), round(jack, 2), round(four, 2))
+    if key in _GCACHE:
+        return _GCACHE[key]
+
+    n = _ns(dur + ring)
+    y = np.zeros(n)
+
+    # ── 현 하나를 뜯는다. 8피트(원음)와 4피트(옥타브 위)를 각각 부른다 ──
+    for oct_, amp, sd in ((0, 1.0, 0), (12, four, 91)):
+        if amp <= 0.0:
+            continue
+        f0 = midi2f(midi + oct_)
+        if f0 >= SR / 2.2:                       # 4피트가 너무 높으면 접는다
+            continue
+        N = max(3, int(round(SR / f0)) - 1)
+        rng = np.random.default_rng(midi * 349 + int(vel * 100) + sd)
+
+        # ① 깃털은 딱딱하다 — 나일론보다 세 배 넓게 연다
+        exc = rng.uniform(-1, 1, N)
+        fc = float(np.clip(f0 * 22.0, 1800.0, 12000.0))
+        exc = signal.lfilter(*signal.butter(2, fc / (SR / 2), btype="low"), exc)
+        # ② 뜯는 자리가 현의 끝 — 콤 필터의 골이 낮은 배음을 판다
+        pp = max(1, int(N * pluck))
+        exc = exc - np.concatenate([np.zeros(pp), exc[:-pp]])
+
+        x = np.zeros(n)
+        x[:N] = exc
+        # ⑤ 짧게 죽는다. 나일론 1.2+3.0 · 플라멩코 1.0+2.6 → 0.55+1.5
+        tau = 0.55 + 1.5 * np.exp(-f0 / 200.0)
+        d = float(np.clip(damp * np.exp(-1.0 / (tau * f0)), 0.0, 0.9995))
+        a = np.zeros(N + 3)
+        a[0] = 1.0
+        a[N] = -d * 0.25
+        a[N + 1] = -d * 0.50
+        a[N + 2] = -d * 0.25
+        # ③ 4피트는 8피트보다 살짝 늦게 뜯힌다 — 잭 둘이 동시에 안 튄다
+        s = signal.lfilter([1.0], a, x)
+        if oct_ and n > 40:
+            s = np.concatenate([np.zeros(37), s[:-37]])
+        y += amp * s
+
+    # 몸통 — 챔발로는 상판이 얇고 넓다. 낮은 모드가 약하고 중역이 살아 있다
+    for fc2, q2, g in [(118, 8.0, 0.14), (232, 6.0, 0.20),
+                       (492, 5.0, 0.17), (880, 4.0, 0.09)]:
+        b, a2 = signal.iirpeak(fc2 / (SR / 2), q2)
+        y += g * signal.lfilter(b, a2, y)
+
+    # ④ 잭 — 깃털이 현을 넘어가는 「딱」. 손톱보다 짧고 높고 마르다
+    if jack > 0:
+        nl = _ns(0.004)
+        cl = np.random.default_rng(midi * 7 + 13).uniform(-1, 1, nl)
+        cl *= np.exp(-np.arange(nl) / (SR * 0.00055))
+        cl = signal.lfilter(*signal.butter(2, 3800 / (SR / 2), btype="high"), cl)
+        y[:nl] += 0.38 * jack * cl
+
+    y = signal.lfilter(*signal.butter(2, 13000 / (SR / 2), btype="low"), y)
+
+    m = np.abs(y).max()
+    if m > 0:
+        y = y / m
+    e = np.ones(n)
+    r0 = _ns(dur)
+    if r0 < n:
+        # 건반을 놓으면 댐퍼가 바로 잡는다. 피아노처럼 여운이 안 남는다
+        e[r0:] = np.exp(-np.arange(n - r0) / (SR * max(ring, 0.05) * 0.22))
+    # 세기를 눌러 받는다 — 세게 눌러도 커지지 않는 악기다
+    y *= e * (0.68 + 0.32 * vel) * 0.55
+    _GCACHE[key] = y
+    return y
+
+
+def flute(midi, dur, vel=0.7, breath=1.0, vib=0.9, attack=0.075, release=0.13):
+    """플루트 (BL-36 ②, 2026-08-13). **7악장에서 그녀의 말을 되받는 목소리.**
+
+    **검수자** — *"mv7 A 원본에 멜로디 악기 적당한 것 골라서, 적당한 선율
+    덧입혀봐줄래?"*
+
+    **7악장 100초의 절반에 선율이 없다.** 남는 셋(아르페지오·베이스·해먼드)은
+    물결이고 걸음이고 화음이지 선율이 아니다. **그런데 무그를 더 부르게 하면
+    안 된다** — 「네 마디마다 한 번」이 그녀가 다가오는 방식이다(`07` 19장).
+    **다른 악기가 그 자리를 메워야 한다.**
+
+    **왜 플루트인가.**
+
+    ① **관악기는 이 곡에 하나도 없다.** 건반 · 뜯는 줄 · 켜는 줄 · 신디사이저
+       뿐이라 **새 음색이 들어갈 자리가 비어 있다.**
+    ② **숨으로 내는 소리다.** 그녀(무그)는 언어가 없는 목소리이고, 플루트는
+       **사람의 숨이 그대로 들리는 유일한 악기**다. 되받는 쪽으로 맞다.
+    ③ **여운이 없다.** 놓으면 바로 끊긴다 — 물 위에 겹쳐도 안 뭉갠다.
+
+    **숨소리가 이 악기의 절반이다.** 관 공명만 만들면 신디사이저로 들린다.
+    실제 플루트는 **부는 사람의 숨이 관 가장자리에서 갈라지는 잡음**이 항상
+    섞여 있고, 소리가 나기 **직전에 그 숨이 먼저 들린다.**
+
+    | 무엇 | 어떻게 |
+    |---|---|
+    | 관 공명 | 배음이 빨리 준다. 2배음 −11 dB · 3배음 −19 dB · 그 위는 급락 |
+    | **숨** | 1.4~6 kHz 잡음. **소리보다 25 ms 먼저 시작**하고 계속 남는다 |
+    | 어택 | 0.075초. 입술이 자리를 잡는 시간 |
+    | 비브라토 | 0.25초 뒤에 **서서히** 생긴다. 처음부터 떨면 기계다 |
+    | 음정 | 시작할 때 아주 살짝 낮았다가 제자리로 — 사람이 부는 소리다 |
+    """
+    key = ("fl", midi, round(dur, 3), round(vel, 2), round(breath, 2),
+           round(vib, 2))
+    if key in _GCACHE:
+        return _GCACHE[key]
+
+    f0 = midi2f(midi)
+    n = _ns(dur + release)
+    t = np.arange(n) / SR
+
+    # ── 음정 — 시작에 살짝 낮았다가 올라오고, 그 뒤 비브라토가 자란다 ──
+    scoop = 1.0 - 0.010 * np.exp(-t / 0.055)
+    grow = np.clip((t - 0.25) / 0.35, 0.0, 1.0)
+    vb = 1.0 + 0.0045 * vib * grow * np.sin(2 * np.pi * 5.1 * t)
+    fenv = f0 * scoop * vb
+
+    # ── 관 — 배음이 빨리 준다. 고음일수록 더 순수해진다 ──────────────
+    ph = 2 * np.pi * np.cumsum(fenv) / SR
+    hi = np.clip((midi - 60) / 24.0, 0.0, 1.0)          # 높을수록 순음에 가깝다
+    amps = [1.0, 0.28 * (1 - 0.6 * hi), 0.11 * (1 - 0.7 * hi),
+            0.045 * (1 - 0.8 * hi), 0.018 * (1 - 0.9 * hi)]
+    y = np.zeros(n)
+    for k, a in enumerate(amps, start=1):
+        if f0 * k >= SR / 2.1:
+            break
+        y += a * np.sin(k * ph)
+    y /= sum(amps)
+
+    # ── 숨 — **이것이 없으면 신디사이저다** ────────────────────────
+    if breath > 0:
+        rng = np.random.default_rng(midi * 617 + int(vel * 100) + 3)
+        nz = rng.normal(0.0, 1.0, n)
+        b, a2 = signal.butter(2, [1400 / (SR / 2), 6000 / (SR / 2)], btype="band")
+        nz = signal.lfilter(b, a2, nz)
+        # 부는 순간이 제일 세고, 그 뒤로도 계속 깔린다
+        bl = 0.055 + 0.16 * np.exp(-t / 0.05)
+        y = y * (1.0 - 0.10 * breath) + breath * bl * nz
+
+    # ── 포락선 — 숨이 25 ms 먼저 나간다 ────────────────────────────
+    e = np.ones(n)
+    at = max(1, _ns(attack))
+    e[:at] = np.sin(np.linspace(0, np.pi / 2, at)) ** 1.6
+    r0 = _ns(dur)
+    if r0 < n:
+        rl = n - r0
+        e[r0:] = np.cos(np.linspace(0, np.pi / 2, rl)) ** 1.3
+    lead = _ns(0.025)
+    if breath > 0 and lead < at:
+        e[:lead] = np.maximum(e[:lead],
+                              np.linspace(0.0, 0.30, lead) * breath)
+    y *= e
+
+    m = np.abs(y).max()
+    if m > 0:
+        y = y / m
+    y *= vel * 0.55
+    _GCACHE[key] = y
+    return y
+
+
+def piccolo(midi, dur, vel=0.7, breath=1.0, vib=0.6, attack=0.045,
+            release=0.10):
+    """피콜로. `flute()` 에서 파생했다 (BL-36 ②, 2026-08-13).
+
+    **검수자** — *"플루트 시도는 좋았는데, 소리가 묻혀버리네. 피콜로 정도되야
+    들리려나?"*
+
+    **묻힌 원인은 음량이 아니라 음역이었다.** 7악장 물소리(피아노 아르페지오)가
+    **MIDI 57~79** 를 쓰는데 플루트를 **74~77** 에 놓았다 — **그 안이다.**
+    같은 높이에서 겹치면 키워도 섞인다.
+
+    **피콜로는 작은 관이라 소리가 다르다.**
+
+    | | 플루트 | 피콜로 |
+    |---|---|---|
+    | 관 길이 | 약 66 cm | **약 32 cm** — 절반 |
+    | 배음 | 2배음 −11 dB | **더 약하다.** 거의 순음에 가깝다 |
+    | 숨 | 은은하게 깔린다 | **더 거칠고 앞에 나온다** — 관이 좁아 숨이 세게 갈린다 |
+    | 어택 | 0.075초 | **0.045초.** 관이 짧아 빨리 선다 |
+    | 비브라토 | 넉넉하다 | **얕다.** 높은 음에서 크게 떨면 음정이 흔들려 들린다 |
+
+    **높은 음에서 순음에 가깝다는 것이 뚫는 이유다.** 배음이 없으면 다른
+    악기의 배음과 부딪힐 것도 없어서, **작아도 자기 자리에 혼자 있는다.**
+
+    **날카롭다.** 이 악장은 곡에서 조용한 축이므로 **너무 셀 수 있다** —
+    그것이 판정 대상이다.
+    """
+    key = ("pic", midi, round(dur, 3), round(vel, 2), round(breath, 2),
+           round(vib, 2))
+    if key in _GCACHE:
+        return _GCACHE[key]
+
+    f0 = midi2f(midi)
+    n = _ns(dur + release)
+    t = np.arange(n) / SR
+
+    scoop = 1.0 - 0.007 * np.exp(-t / 0.035)
+    grow = np.clip((t - 0.20) / 0.30, 0.0, 1.0)
+    vb = 1.0 + 0.0030 * vib * grow * np.sin(2 * np.pi * 5.6 * t)
+    fenv = f0 * scoop * vb
+
+    # 짧은 관 — 배음이 거의 없다. 이것이 뚫는 이유다
+    ph = 2 * np.pi * np.cumsum(fenv) / SR
+    amps = [1.0, 0.13, 0.040, 0.012]
+    y = np.zeros(n)
+    for k, a in enumerate(amps, start=1):
+        if f0 * k >= SR / 2.1:
+            break
+        y += a * np.sin(k * ph)
+    y /= sum(amps)
+
+    # 숨 — 관이 좁아 더 거칠고 더 높은 데서 갈린다
+    if breath > 0:
+        rng = np.random.default_rng(midi * 719 + int(vel * 100) + 11)
+        nz = rng.normal(0.0, 1.0, n)
+        b, a2 = signal.butter(2, [2600 / (SR / 2), 9500 / (SR / 2)],
+                              btype="band")
+        nz = signal.lfilter(b, a2, nz)
+        bl = 0.075 + 0.20 * np.exp(-t / 0.035)
+        y = y * (1.0 - 0.12 * breath) + breath * bl * nz
+
+    e = np.ones(n)
+    at = max(1, _ns(attack))
+    e[:at] = np.sin(np.linspace(0, np.pi / 2, at)) ** 1.4
+    r0 = _ns(dur)
+    if r0 < n:
+        e[r0:] = np.cos(np.linspace(0, np.pi / 2, n - r0)) ** 1.3
+    lead = _ns(0.018)
+    if breath > 0 and lead < at:
+        e[:lead] = np.maximum(e[:lead],
+                              np.linspace(0.0, 0.34, lead) * breath)
+    y *= e
+
+    m = np.abs(y).max()
+    if m > 0:
+        y = y / m
+    y *= vel * 0.55
+    _GCACHE[key] = y
+    return y
+
+
 def golpe(vel=0.8):
     """골페 — 기타 **상판을 손가락으로 두드린다.** 플라멩코 특유의 타격.
 

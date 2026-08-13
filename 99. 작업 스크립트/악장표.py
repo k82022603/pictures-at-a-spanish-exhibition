@@ -32,6 +32,7 @@ CLOG = os.path.join(HERE, "chordlog.npy")
 STEMS = os.path.join(HERE, "스템")
 
 STEM_NAME = {"kb": "피아노", "org": "해먼드", "bass": "베이스", "str": "현악",
+             "wind": "플루트",
              "gtr": "기타", "lead": "무그", "perc": "팔마스·카혼", "drum": "드럼"}
 
 # **스템은 페이더를 곱하기 전 상태다** (`화성.py` save_stems 주석). 그대로 재면
