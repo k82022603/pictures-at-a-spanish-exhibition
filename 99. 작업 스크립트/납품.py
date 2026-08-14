@@ -204,6 +204,29 @@ def main():
         # 둘을 함께 구울 때만 이름에 비트를 박는다. 한 판이면 이름 그대로다
         sfx = " (%dbit)" % b if len(bits_list) > 1 else ""
         fl = os.path.join(outdir, name + sfx + ".flac")
+        # ── 있는 파일을 말없이 덮지 않는다 (2026-08-14 사고) ──────────────
+        #
+        # **오늘 승인된 32비트 전곡을 24비트로 덮어썼다.** `--bits 24` 가
+        # 인식되지 않아 32비트로 떨어졌고(경고는 찍혔다), **한 판만 구우면
+        # 이름에 비트를 안 박으므로 같은 이름으로 나가** 승인 파일 위에
+        # 그대로 얹혔다. 사본이 남아 있어 되돌렸다.
+        #
+        # **R9 — 승인받은 산출물은 내용도 이름도 바꾸지 않는다.** 그것을
+        # 사람이 매번 지킬 것이 아니라 **도구가 막는다.**
+        #
+        # 덮어써야 할 때는 `--force` 를 붙인다. **붙이는 순간 스스로
+        # 「지금 승인된 것을 지우는가」를 묻게 된다** — 그것이 목적이다.
+        if os.path.exists(fl) and "--force" not in sys.argv:
+            print()
+            print("✘ 이미 있는 파일입니다 — 덮어쓰지 않고 멈춥니다.")
+            print("   %s" % os.path.basename(fl))
+            print()
+            print("   **승인된 산출물일 수 있습니다** (R9). 셋 중 하나를 하세요.")
+            print("     · 다른 이름으로 굽는다  ← 새 판은 새 파일이다")
+            print("     · 그 파일이 낡았다면 `--force`")
+            print("     · 비트만 더 필요하면 `--bits both` 로 굽는다"
+                  " (이름에 비트가 박혀 안 겹칩니다)")
+            sys.exit(1)
         ok, got = bake(src, fl, b, flac_bin, cut)
         print()
         print("FLAC     %s  %s비트  %.1f MB" % (os.path.basename(fl), got, mb(fl)))
