@@ -53,6 +53,7 @@ def read_source():
     """전곡화성.py 에서 악장 경계와 템포를 읽는다."""
     src = io.open(SRC, encoding="utf-8").read().split("\n")
     movs, cur, tempo, prog, stages = [], None, {}, {}, {}
+    cand, vers = {}, {}                       # 판별 후보 · TEMPOnVER 가 고른 판
     for ln in src:
         m = re.match(r'mark\("(\d)악장 ([^·"]+)', ln)
         if m:
@@ -69,9 +70,18 @@ def read_source():
         # 이제 **음악적 숫자를 그대로** 담고 있으므로 계산하지 않고 읽기만 한다.
         # 단위는 악장마다 다르다 — 4분음표 · 부점4분 · 2+2+3 그룹 맥박.
         # 그 단위를 여기서 추측하면 틀리므로 소스의 `단위` 주석에서 읽는다.
-        m4 = re.match(r"TEMPO(\d) = (\[.*)", ln)
+        # **판이 둘 이상인 악장이 있다** (2026-08-14). 7악장이 `TEMPO7VER` 로
+        # `TEMPO7_STEP`(60→72) 과 `TEMPO7_FLAT`(60 고정) 을 고른다. 옛 정규식은
+        # `TEMPO7 = [` 만 찾았으므로 **빠르기 줄이 통째로 비어서 나왔다** —
+        # 검수자가 받는 표에서 그 칸만 사라진다. 이 프로젝트는 판을 지우지 않고
+        # 남기므로(R11) **여러 판을 읽고 활성판을 고르는 것이 기본값**이어야 한다.
+        m5 = re.match(r'TEMPO(\d)VER = "(\w+)"', ln)
+        if m5:
+            vers[int(m5.group(1))] = m5.group(2).upper()
+        m4 = re.match(r"TEMPO(\d)(_[A-Z]+)? = (\[.*)", ln)
         if m4:
             n = int(m4.group(1))
+            suf = m4.group(2) or ""
             i0 = src.index(ln)
             buf, depth = "", 0
             for ch in NL.join(src[i0:])[ln.index("["):]:
@@ -90,12 +100,20 @@ def read_source():
                         elif "♩." in probe or "부점" in probe:
                             u = "♩."
                         break
-                stages[n] = (u, nums)
+                cand[(n, suf)] = (u, nums)
             except Exception:
                 pass
         m3 = re.match(r"PROG(\d) = (\[.*)", ln)
         if m3:
             prog[int(m3.group(1))] = m3.group(2)
+    # 활성판을 고른다 — 접미사 없는 것이 있으면 그것이고, 없으면 `TEMPOnVER`
+    # 가 가리키는 것이다. **둘 다 없으면 채우지 않는다** (추측하지 않는다).
+    for (n, suf), val in cand.items():
+        if suf == "":
+            stages[n] = val
+    for n, v in vers.items():
+        if n not in stages and (n, "_" + v) in cand:
+            stages[n] = cand[(n, "_" + v)]
     return movs, tempo, prog, stages
 
 
@@ -189,8 +207,12 @@ def main():
         st = stages.get(n)
         if st:
             unit, vals = st
-            print("  빠르기      %s = %s   ← **단계로 바뀐다** (BL-33)"
-                  % (unit, " → ".join("%.0f" % s for s in vals)))
+            # 단계가 하나뿐이면 「단계로 바뀐다」가 거짓말이 된다 (2026-08-14 —
+            # 7악장이 60 고정이 되면서 드러났다). **표는 사실만 적는다.**
+            print("  빠르기      %s = %s%s"
+                  % (unit, " → ".join("%.0f" % s for s in vals),
+                     "   ← **단계로 바뀐다** (BL-33)" if len(vals) > 1
+                     else "   (처음부터 끝까지 같다)"))
             if unit.startswith("2+2+3"):
                 print("              4분음표가 아니다. 한 마디에 셋. "
                       "8분음표로 적으면 %s 이고 세 배 빨라 보인다"
