@@ -28,6 +28,7 @@ import numpy as np
 from scipy.signal import butter, sosfilt
 
 import 화성
+import 음높이
 
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
@@ -67,36 +68,26 @@ def load(path, t0=None, dur=None):
 
 
 def f0_track(x, lo=70.0, hi=800.0, hop=0.01, win=0.045):
-    """0.01초마다 높이를 잰다. 목소리가 아닌 구간은 0 으로 둔다."""
-    sos = butter(4, [lo * 0.8, min(hi * 2.5, SR / 2 - 100)], "bandpass",
-                 fs=SR, output="sos")
-    y = sosfilt(sos, x)
-    w, h = int(win * SR), int(hop * SR)
-    out = []
-    for i in range(0, max(1, len(y) - w), h):
-        s = y[i:i + w] - y[i:i + w].mean()
-        e = np.sqrt(np.mean(s ** 2))
-        if e < 1e-4:
-            out.append(0.0)
-            continue
-        r = np.correlate(s, s, "full")[len(s) - 1:]
-        r = r / (r[0] + 1e-12)
-        a, b = int(SR / hi), min(int(SR / lo), len(r) - 1)
-        if b <= a + 2:
-            out.append(0.0)
-            continue
-        band = r[a:b]
-        pk = band.max()
-        if pk < 0.35:                      # 주기성이 약하면 노래가 아니다
-            out.append(0.0)
-            continue
-        cand = np.where(band > 0.86 * pk)[0]
-        grp = [cand[0]]
-        for j in cand[1:]:
-            if j - grp[-1] > 2:
-                grp.append(j)
-        out.append(SR / (a + grp[-1]))
-    return np.array(out)
+    """0.01초마다 높이를 잰다. 목소리가 아닌 구간은 0 으로 둔다.
+
+    **2026-08-20 — 이 함수의 본문이 틀려 있었다.** 자기상관에서 **가장 큰
+    지연**을 집고 있었는데, 주기가 T 인 소리는 T·2T·3T 에 다 봉우리가 서므로
+    그러면 **2T·3T 를 집어 높이가 1/2·1/3 로 읽힌다.**
+
+      | 넣은 음 | 옛 자가 읽은 값 |
+      |---|---|
+      | 440 Hz (A4) | **146 Hz (D3)** |
+      | 698 Hz (F5) | **140 Hz (C♯3)** |
+
+    **낮은 소리는 우연히 맞았고 노래 목소리 대역에서 크게 틀렸다.**
+    8-14 참조 음원 실측과 8-19 Suno 실측이 이 자로 나왔다. 다시 잰 값과
+    경위는 `97. 회고` **T-12** · `14` **11장**.
+
+    **본문은 `음높이.py` 한 곳으로 옮겼다**(`11. 공용 함수`). 이름은 그대로
+    두어 부르는 쪽을 안 건드린다. 옛 자로 견주려면 `음높이.재기(x,
+    옛방식=True)`.
+    """
+    return 음높이.재기(x, lo=lo, hi=hi, hop=hop, win=win)
 
 
 def band_ratio(x):
