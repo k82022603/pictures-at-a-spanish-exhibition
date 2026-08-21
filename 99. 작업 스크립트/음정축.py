@@ -9,9 +9,29 @@ from PIL import Image, ImageDraw, ImageFont
 
 W, H = 1856, 46
 OCT = 6                       # C1 ~ C7
-FONT = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-FS = ImageFont.truetype(FONT, 15)
-FT = ImageFont.truetype(FONT, 12)
+# **글꼴 경로를 하나만 박아두지 않는다** (2026-08-20 정정).
+# 옛 샌드박스(리눅스)의 경로가 박혀 있어서 **이 PC 에서 `cannot open resource`**
+# 로 죽었다. 8-06 에 만든 `음정축.png` 가 남아 있어서 넉 달 동안 안 드러났다.
+# **도구가 안 도는 것을 산출물이 가려주고 있었다.**
+import os
+
+FONTS = [
+    "C:/Windows/Fonts/arialbd.ttf",                       # 윈도우
+    "C:/Windows/Fonts/segoeuib.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",   # 리눅스
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",      # 맥
+]
+
+
+def _font(크기):
+    for p in FONTS:
+        if os.path.exists(p):
+            return ImageFont.truetype(p, 크기)
+    raise SystemExit("굵은 글꼴을 못 찾았다 — FONTS 목록에 경로를 더하세요")
+
+
+FS = _font(15)
+FT = _font(12)
 
 BLACK_PC = {1, 3, 6, 8, 10}                 # C♯ E♭ F♯ A♭ B♭
 IN_KEY = {10, 0, 2, 3, 5, 7, 9}             # B♭ C D E♭ F G A — 이 곡의 음집합

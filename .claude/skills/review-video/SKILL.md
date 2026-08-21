@@ -47,7 +47,15 @@ python 자막생성.py   # → 자막.ass    (chordlog.npy 필요)
 
 ## 2. 필터그래프
 
-`영상필터.txt`에 여러 줄로 두고, **개행을 제거해** `-filter_complex_script`로 넘긴다.
+`영상필터.txt`에 여러 줄로 두고, **개행을 제거해** `-/filter_complex`로 넘긴다.
+
+> **⚠ 옵션 이름이 바뀌었다 (2026-08-20).** 예전에는 `-filter_complex_script` 였는데
+> **ffmpeg 9.0 에서 없어졌다** — `Unrecognized option 'filter_complex_script'`.
+> 지금은 **`-/filter_complex <파일>`** 이다. 옵션 이름 앞의 `/` 가 「값을 파일에서
+> 읽어라」라는 뜻이다.
+>
+> **넉 달 동안 이 스킬의 명령이 안 도는 상태였다.** 2026-08-07 에 ffmpeg 를 새로
+> 깔았는데 그 뒤로 검토 영상을 안 만들어서 안 드러났다.
 
 ```bash
 tr -d '\n' < 영상필터.txt > 영상필터1.txt
@@ -88,7 +96,7 @@ color=c=0x0B0D12:s=1920x1080:r=30:d=580[bg];
 
 ```bash
 ffmpeg -hide_banner -v warning -y -i 전곡화성.wav \
-  -filter_complex_script 영상필터1.txt -map "[vout]" -map 0:a \
+  -/filter_complex 영상필터1.txt -map "[vout]" -map 0:a \
   -c:v libx264 -preset veryfast -crf 20 -profile:v high -level 4.1 \
   -pix_fmt yuv420p -r 30 -g 60 -keyint_min 60 -sc_threshold 0 \
   -c:a aac -b:a 384k -ar 48000 -ac 2 -movflags +faststart \
@@ -155,25 +163,23 @@ ffmpeg -i rv.mp4 -i 전곡화성.wav -map 0:v -map 1:a \
 
 영상에서 오디오를 다시 뽑아 원본과 교차상관한다. **접합부를 포함한 여러 지점**에서 본다.
 
+**`영상검증.py` 가 한다.** 동기·규격·프레임 수 셋을 한 번에 잰다.
+
 ```bash
-ffmpeg -v error -y -i "최종.mp4" -ar 44100 -ac 2 chk.wav
-python - <<'PY'
-import numpy as np
-from scipy.io import wavfile
-from scipy import signal as sg
-sr, a = wavfile.read('전곡화성.wav'); a = a.astype(float).mean(1) / 32768
-_,  b = wavfile.read('chk.wav');     b = b.astype(float).mean(1) / 32768
-for t0 in (30, 160, 275, 425, 540):        # 접합점을 반드시 포함
-    s, w = int(t0 * sr), int(4 * sr)
-    x, y = a[s:s+w], b[s:s+w]
-    c = sg.correlate(y - y.mean(), x - x.mean(), mode='same')
-    lag = int(np.argmax(np.abs(c)) - len(x) // 2)
-    r = np.corrcoef(x, np.roll(y, -lag)[:len(x)])[0, 1]
-    print('%4ds  지연 %+3d 샘플 (%+.2f ms)  상관 %.4f' % (t0, lag, lag / sr * 1000, r))
-PY
+python 영상검증.py "전곡 vN.NN - 화성 검토 영상.mp4"
 ```
 
 **통과 기준: 전 지점 0 샘플.** v1.6에서 접합부 포함 전부 0이었다.
+
+> **⚠ 여기 있던 코드를 걷어냈다 (2026-08-20).** 두 가지가 틀려 있었다.
+>
+> | | 무엇 |
+> |---|---|
+> | ① | **`python - <<'PY'` heredoc** — 8-19 에 두 번 깨져 **「여러 줄 파이썬을 셸에 끼우지 않는다」**를 규칙으로 박았는데 **여기 그 꼴이 남아 있었다** |
+> | ② | **`/ 32768`** — 마스터가 float 로 바뀐 뒤 이 나눗셈이 악장별 RMS 를 **−110 dB** 로 찍은 적이 있다(8-12). **`화성.read_wav` 가 자료형을 보고 나눈다** |
+>
+> **`검증.py` 7번 검사가 이것을 못 잡았다** — `99. 작업 스크립트/*.py` 만 훑고
+> **스킬 폴더는 안 본다.** 「검사가 통과했다는 것이 없다는 뜻이 아니다」의 실례다.
 
 ### (b) 화음 라벨 ↔ 실제 울리는 음
 

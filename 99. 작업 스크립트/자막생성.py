@@ -70,8 +70,42 @@ CUE = [
     (572.0, 579.5, "B♭–D–F–A   B♭장조로 편입 — 상실이 아니라 편입이다"),
 ]
 
-TITLE = "《스페인 전람회의 그림》   전곡 코드 진행  v1.4"
-SUB = "화성 검토용 · 성부 진행 자동 최적화 · 병행 5·8도 0건 · 평균 이동 3.93반음"
+# **제목과 요약을 손으로 박아두지 않는다** (2026-08-20 정정).
+# `v1.4` 와 `평균 이동 3.93반음` 이 박혀 있었다. **그동안 곡이 v4.24 까지
+# 왔고 화음도 263개에서 335개가 됐는데 화면에는 넉 달 전 숫자가 떠 있었다.**
+# 검토용 영상이 **검토 대상이 무엇인지 틀리게 말하고 있었던 것**이다.
+#
+# 버전은 `04` 대장에서 읽고, 성부 이동은 `chordmov.npy` 에서 잰다.
+import io
+import os
+import re
+
+_R = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+
+
+def _버전():
+    try:
+        s = io.open(os.path.join(_R, "04. 문서 개정 이력.md"),
+                    encoding="utf-8").read()
+        m = re.search(r"현재 버전 \| \*\*(v[0-9.]+)\*\*", s)
+        return m.group(1) if m else "v?"
+    except Exception:
+        return "v?"
+
+
+def _이동():
+    try:
+        a = np.asarray(np.load(os.path.join(os.path.dirname(
+            os.path.abspath(__file__)), "chordmov.npy"),
+            allow_pickle=True), float).ravel()
+        a = a[np.isfinite(a)]
+        return "평균 이동 %.2f반음" % a.mean() if len(a) else "평균 이동 —"
+    except Exception:
+        return "평균 이동 —"
+
+
+TITLE = "《스페인 전람회의 그림》   전곡 코드 진행  %s" % _버전()
+SUB = "화성 검토용 · 성부 진행 자동 최적화 · %s" % _이동()
 
 HEAD = """[Script Info]
 ScriptType: v4.00+
