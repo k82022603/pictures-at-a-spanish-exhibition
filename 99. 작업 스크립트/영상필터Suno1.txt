@@ -1,0 +1,1 @@
+[0:a]showcqt=s=1856x480:fps=30:count=6:bar_g=2.4:sono_g=3.4:basefreq=32.703196:endfreq=2093.004522:bar_v=23:sono_v=16:axis_h=46:sono_h=180:axisfile=음정축.png:cscheme=0.13|0.40|0.66|0.26|0.46|0.44[cqt];color=c=0x0B0D12:s=1920x1080:r=30:d=620[bg];[bg][cqt]overlay=32:320:shortest=1[v0];[v0]drawbox=x=31:y=319:w=1858:h=482:color=0x233247@1.0:t=2[v1];[v1]ass=자막Suno.ass[vout]

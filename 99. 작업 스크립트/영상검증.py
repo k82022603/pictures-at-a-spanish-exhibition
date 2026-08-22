@@ -32,9 +32,29 @@ import 화성
 if sys.platform == "win32":
     sys.stdout.reconfigure(encoding="utf-8")
 
-SR = 44100
 HERE = os.path.dirname(os.path.abspath(__file__))
-원본 = os.path.join(HERE, "전곡화성.wav")
+
+# ── **견줄 원본은 인자로 받는다** (2026-08-22) ────────────────────
+#
+# 여기 `전곡화성.wav` 가 박혀 있었다. 우리 곡만 만들던 동안은 맞았다.
+# **그런데 Suno 판 영상을 재려고 돌렸더니 닮은 정도가 0.09 로 나왔다** —
+# 「어긋났다」가 다섯 줄 찍혔고, **동기가 틀린 것이 아니라 다른 곡과
+# 견주고 있었다.** 원본을 안 주면 여전히 우리 마스터를 쓴다.
+#
+# > **같은 모양을 하루에 세 번 만났다** — `악장표.py`(우리 악보 전제) ·
+# > `자막생성.py`(chordlog 전제) · 여기. **도구가 조용히 「우리 곡」을
+# > 가정하고 있었고, 남의 음원을 넣으면 그럴듯한 틀린 값을 낸다.**
+#
+# **표본율도 안 박는다.** 44100 을 박아놓고 48 kHz 파일을 리샘플하면
+# 비교가 한 겹 더 흐려진다. 영상에서 뽑은 소리의 표본율을 그대로 쓴다.
+def _원본경로():
+    for i, a in enumerate(sys.argv):
+        if a == "--from" and i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+    return os.path.join(HERE, "전곡화성.wav")
+
+
+원본 = _원본경로()
 볼곳 = (30, 160, 275, 425, 540)                  # 접합점 275·425 포함
 
 
@@ -91,15 +111,19 @@ def main():
 
     # ── (a) 동기 ──────────────────────────────────────────────
     print("\n=== 영상 ↔ 소리 동기 ===")
+    print("  견줄 원본   %s" % os.path.basename(원본))
     임시 = os.path.join(HERE, "_동기확인.wav")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", 영상,
-                    "-ar", str(SR), "-ac", "2", 임시], check=True)
     sr1, x0 = 화성.read_wav(원본)
+    # **원본의 표본율로 뽑는다** — 리샘플을 한 겹 줄인다
+    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", 영상,
+                    "-ar", str(sr1), "-ac", "2", 임시], check=True)
+    SR = sr1
     sr2, y0 = 화성.read_wav(임시)
     x0 = x0.mean(1) if x0.ndim > 1 else x0
     y0 = y0.mean(1) if y0.ndim > 1 else y0
 
     어긋남 = 0
+    최고닮음 = 0.0
     for t0 in 볼곳:
         s, w = int(t0 * SR), int(4 * SR)
         if s + w > min(len(x0), len(y0)):
@@ -108,11 +132,19 @@ def main():
         c = sg.correlate(y - y.mean(), x - x.mean(), mode="same")
         lag = int(np.argmax(np.abs(c)) - len(x) // 2)
         r = float(np.corrcoef(x, np.roll(y, -lag)[:len(x)])[0, 1])
+        최고닮음 = max(최고닮음, abs(r))
         if lag != 0:
             어긋남 += 1
         print("  %4d초  지연 %+3d 샘플 (%+.2f ms)  닮은 정도 %.4f  %s"
               % (t0, lag, lag / SR * 1000, r, "OK" if lag == 0 else "← 어긋났다"))
     os.remove(임시)
+
+    if 어긋남 and 최고닮음 < 0.5:
+        print()
+        print("  ★ 닮은 정도가 %.2f 로 너무 낮습니다 — **동기가 아니라 「견줄 원본」을 먼저 의심하세요.**"
+              % 최고닮음)
+        print("     지금 견준 것: %s" % os.path.basename(원본))
+        print("     다른 음원이면  --from \"<그 음원.wav>\"  을 붙입니다.")
 
     print("\n=== 판정 ===")
     if 나쁨 == 0 and 어긋남 == 0:

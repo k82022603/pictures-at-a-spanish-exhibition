@@ -50,7 +50,10 @@ from scipy.io import wavfile
 
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8")
 HERE = os.path.dirname(os.path.abspath(__file__))
-SR = 44100
+# **표본율을 여기 박지 않는다** (2026-08-22). `SR = 44100` 이 오래 있었는데
+# **아무 데도 안 쓰였다.** 그런데 Suno 판(48 kHz)을 구우려던 날 그 줄을 보고
+# 「이 도구는 44.1 전용인가」를 한참 따졌다. **안 쓰는 값이 판단을 막았다.**
+# 표본율은 `flac` 과 `ffmpeg` 이 파일에서 읽는다.
 
 
 def find_flac():
@@ -239,6 +242,36 @@ def main():
     if bad:
         raise SystemExit(1)
 
+    # ── ④ MP3 — 부를 때만 굽는다 ────────────────────────────
+    #
+    # **2026-08-12 에 검수자가 "mp3는 더이상 만들지 않아도 됨" 이라고 해서
+    # 주석으로 내려놨다가, 2026-08-22 에 "FLAC(24/32) · MP3 작업 해주세요"
+    # 로 다시 올라왔다.** 그래서 **지우지 않고 옵션으로 둔다** — 판단이
+    # 두 번 뒤집힌 것은 상황이 달라서이지 누가 틀려서가 아니다.
+    #
+    # **FLAC 처럼 되돌려 대조할 수는 없다.** 손실 압축이라 원본과 다른 것이
+    # 정상이다. 대신 **길이와 표본율이 유지됐는지**를 본다 — 그것이 어긋나면
+    # 굽기가 실패한 것이다.
+    if "--mp3" in sys.argv:
+        mp3 = os.path.join(outdir, name + ".mp3")
+        if os.path.exists(mp3) and "--force" not in sys.argv:
+            print()
+            print("✘ 이미 있습니다 — %s (덮어쓰려면 --force)" % os.path.basename(mp3))
+            raise SystemExit(1)
+        run(["ffmpeg", "-hide_banner", "-v", "error", "-y", "-i", src,
+             "-c:a", "libmp3lame", "-b:a", "320k", mp3])
+        원 = float(probe(src, "duration") or 0)
+        난 = float(probe(mp3, "duration") or 0)
+        sr원, sr난 = probe(src, "sample_rate"), probe(mp3, "sample_rate")
+        print()
+        print("MP3      %s  320 kbps  %.1f MB" % (os.path.basename(mp3), mb(mp3)))
+        print("  길이       %s (%.2f초 → %.2f초 · 차이 %+.3f초)"
+              % ("★ 같다" if abs(원 - 난) < 0.05 else "✘ 다르다", 원, 난, 난 - 원))
+        print("  표본율     %s (%s → %s)"
+              % ("★ 같다" if sr원 == sr난 else "✘ 다르다", sr원, sr난))
+        if abs(원 - 난) >= 0.05 or sr원 != sr난:
+            raise SystemExit(1)
+
     # 발췌는 여기서 끝난다 — 악장별 구간표는 전곡에만 붙는다
     if cut:
         print()
@@ -256,6 +289,20 @@ def main():
     # **스킬에 적어두는 것으로는 안 지켜졌다.** `11. 공용 함수` 6절이 그날
     # 세운 규칙이 이것이다 — **문서에 적을 수 있는 규칙은 도구로 옮길 수
     # 있는지 먼저 묻는다.** 그래서 납품이 구간표를 낳게 한다.
+    # ── **우리 악보에서 나온 마스터일 때만** 구간표를 붙인다 (2026-08-22) ──
+    #
+    # `악장표.py` 는 **`전곡화성.py` 의 악보**에서 값을 뽑는다. 그런데 Suno 가
+    # 만든 판에는 **악보가 없다 — 소리밖에 없다.** 그대로 돌리면 **우리 곡의
+    # 구간표가 남의 음원 옆에 붙는다.** 숫자가 다 그럴듯해서 더 위험하다.
+    #
+    # **「도구가 성공했다」와 「그 결과가 이 파일에 맞다」가 다른 말이다.**
+    # 이 프로젝트가 여러 번 밟은 모양이라 여기서 막는다.
+    if os.path.abspath(src) != os.path.abspath(os.path.join(HERE, "전곡화성.wav")):
+        print()
+        print("★ 구간표를 안 만들었습니다 — 우리 악보에서 나온 마스터가 아닙니다.")
+        print("   `악장표.py` 는 `전곡화성.py` 의 악보를 읽으므로 이 음원과 안 맞습니다.")
+        print("   Suno 판은 `구조분석2.py` 로 경계를 재고 손으로 씁니다 (`19` 문서).")
+        return
     guide = os.path.join(outdir, "구간표 - %s.md" % name)
     r = subprocess.run([sys.executable, os.path.join(HERE, "악장표.py")],
                        capture_output=True, cwd=HERE,
