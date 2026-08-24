@@ -47,9 +47,56 @@ def 판만들기(묶음, 낼파일):
     return 낼파일
 
 
+def 뼈대판(낼곳):
+    """**영상에 실제로 쓴 사진만** 판으로 만든다. 칸마다 **몇 분 몇 초에 나오는지**를 적는다.
+
+    2026-08-23 추가. 검수자 — *"내 얼굴 나오는 사진들만 빼면 될 듯."*
+
+    ## 왜 시각을 적나
+
+    **얼굴은 숫자로 못 찾는다.** 이 PC 에 얼굴 검출기(`cv2`)가 없고, 있어도
+    **「누구의」 얼굴인지는 못 가린다.** 메모를 뒤져도 안 나온다 — 걸리는 것이
+    전부 *「사람이 개미만 하다」* 류였다.
+
+    **그래서 눈이 본다.** 다만 244장이 아니라 **실제로 쓴 것만** 보면 되고,
+    칸에 시각이 적혀 있으면 **영상에서 바로 그 자리로 갈 수 있다.**
+
+    빼는 것은 [`등급부여.py`](<등급부여.py>) 의 `C판` 에 한 줄 더하면 된다 —
+    **사진을 지우지 않는다**(R11).
+    """
+    import json
+    P = os.path.join(ROOT, "95. 영상 프로젝트", "src", "뼈대.json")
+    if not os.path.exists(P):
+        sys.exit("뼈대.json 이 없다 — `뼈대.py` 를 먼저 돌린다")
+    d = json.load(open(P, encoding="utf-8"))
+    악장이름 = {m["번호"]: m["이름"] for m in d["악장"]}
+
+    칸들 = []
+    for c in d["컷"]:
+        for p in c["사진"]:
+            t = c["시작"]
+            # **경로에서 폴더를 꺼낸다.** 파일 이름만으로는 열 장이 어긋난다
+            칸들.append(("%d:%05.2f  %s" % (t // 60, t % 60, p.split("/")[-1]),
+                         os.path.join(ROOT, *p.split("/")), c["악장"]))
+
+    for i in range(0, len(칸들), 열 * 행):
+        묶음 = 칸들[i:i + 열 * 행]
+        악장들 = sorted({k[2] for k in 묶음})
+        꼬리 = "%d악장" % 악장들[0] if len(악장들) == 1 else \
+               "%d-%d악장" % (악장들[0], 악장들[-1])
+        이름 = "쓴사진 %02d - %s.jpg" % (i // (열 * 행) + 1, 꼬리)
+        p = 판만들기([(a, b) for a, b, _ in 묶음], os.path.join(낼곳, 이름))
+        print("%s  (%d장 · %s)" % (os.path.basename(p), len(묶음),
+                                  악장이름.get(악장들[0], "")))
+    print("\n  **%d장을 %d판에.** 빼실 것은 시각으로 말씀해 주시면 됩니다"
+          % (len(칸들), (len(칸들) + 열 * 행 - 1) // (열 * 행)))
+
+
 def main():
     낼곳 = sys.argv[1] if len(sys.argv) > 1 else os.path.join(ROOT, "_판")
     os.makedirs(낼곳, exist_ok=True)
+    if "--뼈대" in sys.argv:
+        return 뼈대판(낼곳)
     for 폴더 in sorted(os.listdir(사진)):
         d = os.path.join(사진, 폴더)
         if not os.path.isdir(d):

@@ -1,0 +1,21 @@
+{
+  "name": "spanish-exhibition-video",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "studio": "remotion studio src/index.jsx",
+    "render": "remotion render src/index.jsx jeongok out/전곡 뼈대.mp4"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "스페인 전람회의 그림 — 10분 뮤직비디오",
+  "dependencies": {
+    "@remotion/cli": "^4.0.515",
+    "@remotion/renderer": "^4.0.515",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "remotion": "^4.0.515"
+  },
+  "type": "module"
+}
