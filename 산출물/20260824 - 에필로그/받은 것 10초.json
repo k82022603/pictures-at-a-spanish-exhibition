@@ -1,0 +1,16 @@
+{
+  "요청": "01a0332a-30d0-7cf1-9cb0-769413aeb37d",
+  "초": 10,
+  "값추정": 4.69,
+  "받은것": {
+    "video": {
+      "url": "https://v3b.fal.media/files/b/0aa79bb7/lBO7nfzlIwSe3QICbxeTn_video.mp4",
+      "content_type": "video/mp4",
+      "file_name": "video.mp4",
+      "file_size": 1589669
+    },
+    "seed": 285168722
+  },
+  "틀림": null,
+  "말": "The camera is locked off and completely still. The red embroidered shawl lying on the stone floor comes alive in a light breeze: its long knotted fringe lifts and falls, the silk ripples and one corner turns over slowly. In the first seconds the two people on the right walk quietly out of the frame to the right and do not come back. Through the second half the overcast daylight fades steadily and evenly, the stone loses its brightness, and by the end the whole scene has gone almost completely dark - the open doorway staying the deepest black. Everything else is motionless: the stone sentry box, the walls, the paving and the sky do not move. No camera movement, no zoom, no pan. No new people or objects enter. No text, no titles, no captions."
+}
