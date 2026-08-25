@@ -1,0 +1,15 @@
+{
+  "요청": "01a03729-59d1-7aa3-a968-ac94db312c1e",
+  "초": 5,
+  "값추정": 2.34,
+  "받은것": {
+    "video": {
+      "url": "https://v3b.fal.media/files/b/0aa7b5db/DcVgo4AVX2KWjyLeVIPpW_video.mp4",
+      "content_type": "video/mp4",
+      "file_name": "video.mp4",
+      "file_size": 1039927
+    },
+    "seed": 925060867
+  },
+  "말": "The calico cat sitting on the marble floor comes alive: she lifts her head and looks slowly around, blinks, licks one front paw and grooms her chest, shifts her weight and flicks her tail a few times, then settles again. Natural, unhurried cat behaviour. The camera is locked off and completely still. Everything else is motionless: the glazed tile wall, the green tile band, the marble floor and the shadows do not move or change. No camera movement, no zoom, no pan. No people or objects enter. No text, no titles, no captions."
+}

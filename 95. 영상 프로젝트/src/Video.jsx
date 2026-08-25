@@ -4,10 +4,28 @@
 // `뼈대.py` 가 정해 `뼈대.json` 에 적어 두었고, 여기서는 그것을 **그리기만** 한다.
 // 배치를 바꾸려면 이 파일이 아니라 `뼈대.py` 를 고친다.
 import {
-  AbsoluteFill, Audio, Img, Sequence, interpolate,
+  AbsoluteFill, Audio, Img, OffthreadVideo, Sequence, interpolate,
   staticFile, useCurrentFrame, useVideoConfig, Easing,
 } from "remotion";
-import 뼈대 from "./뼈대.json";
+import 뼈대기본 from "./뼈대.json";
+import 뼈대일반 from "./뼈대 일반.json";
+
+// ── 어느 판을 그리나 (2026-08-25) ─────────────────────────
+//
+// | 판 | 그녀 | 에필로그 | 고양이 | 워터마크 |
+// |---|---|---|---|---|
+// | **유튜브 버전** (기본) | 있다 | 있다 | 있다 | `(c) 2026 BLUEBUG` |
+// | **일반 버전** | **없다** | **없다** | 있다 | **없다** |
+//
+// **환경변수로 고른다** — 파일을 바꿔치기하면 **어느 것을 구웠는지 나중에
+// 알 수 없다.** 이 프로젝트는 그 종류의 사고를 이미 겪었다
+// (「고쳤다고 했는데 안 고쳐졌다」).
+//
+//   set REMOTION_PAN=일반  →  일반 버전
+//
+// 에필로그와 워터마크는 뼈대 밖(ffmpeg)이라 여기서 다루지 않는다.
+const 일반인가 = process.env.REMOTION_PAN === "일반";
+const 뼈대 = 일반인가 ? 뼈대일반 : 뼈대기본;
 
 // ── 색 ────────────────────────────────────────────────────
 // 검정이 아니라 **아주 짙은 남색**이다. 순검정은 사진 가장자리와 붙어
@@ -19,6 +37,9 @@ const 글꼴 = "'Malgun Gothic', 'Noto Sans KR', sans-serif";
 
 // `뼈대.json` 의 경로는 원본 폴더 기준이고, Remotion 은 `public/` 아래만 읽는다.
 const 사진경로 = (p) => staticFile(p.replace("2005년 12월 스페인/", "사진/"));
+
+// **영상 컷의 경로는 `public/` 아래 그대로다.** 사진과 달리 폴더를 안 바꾼다.
+const 영상경로 = (p) => staticFile(p);
 
 // ── 화면에 띄울 때 밝히는 것 ──────────────────────────────────
 //
@@ -167,6 +188,34 @@ const 세로한장 = ({ src, i, 보정 }) => {
 // 뒤에 자기 자신을 흐리게 깐다. **좌우에 흐린 띠가 생기는 대신 한 픽셀도 안 잘린다.**
 //
 // **덤이 하나 있다** — 늘어나는 배율이 **1.88배 → 1.41배**로 줄어 **덜 무르다.**
+// ── 영상 한 편 ────────────────────────────────────────────
+//
+// **사진과 같은 자리에 같은 방식으로 놓는다** — 온전히 놓고 뒤에 흐린 배경.
+// 다른 점은 둘이다.
+//
+// | | |
+// |---|---|
+// | **켄번스를 안 준다** | 영상이 이미 움직인다. 둘을 겹치면 멀미가 난다 |
+// | **`muted`** | 소리는 마스터에서 온다. 여기서 나오면 겹친다 |
+//
+// `OffthreadVideo` 는 렌더용이다 — 브라우저 재생이 아니라 **프레임을 정확히
+// 꺼내 오므로** 굽는 결과가 재현된다.
+const 영상한편 = ({ src }) => (
+  <AbsoluteFill style={{ backgroundColor: 바탕, overflow: "hidden" }}>
+    <OffthreadVideo src={src} muted style={{
+      width: "100%", height: "100%", objectFit: "cover",
+      filter: "blur(48px) brightness(0.42) saturate(0.7)",
+      transform: "scale(1.2)",
+    }} />
+    <AbsoluteFill style={{ justifyContent: "center", alignItems: "center" }}>
+      <OffthreadVideo src={src} muted style={{
+        height: "100%", width: "auto", objectFit: "contain",
+        boxShadow: "0 0 90px rgba(0,0,0,.75)",
+      }} />
+    </AbsoluteFill>
+  </AbsoluteFill>
+);
+
 const 가로한장 = ({ src, i, 보정, 줌없이 }) => {
   const 프레임 = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
@@ -240,7 +289,8 @@ const 컷하나 = ({ 컷, i, 경계인가 }) => {
   const p = 컷.사진.map(사진경로);
   return (
     <AbsoluteFill>
-      {컷.종류 === "멀티패널" ? <멀티패널 srcs={p} i={i} 보정={컷.보정} />
+      {컷.종류 === "영상" ? <영상한편 src={영상경로(컷.사진[0])} />
+        : 컷.종류 === "멀티패널" ? <멀티패널 srcs={p} i={i} 보정={컷.보정} />
         : 컷.방향 === "세로" ? <세로한장 src={p[0]} i={i} 보정={컷.보정 && 컷.보정[0]} />
           : <가로한장 src={p[0]} i={i} 보정={컷.보정 && 컷.보정[0]}
               줌없이={Boolean(컷.줌없이)} />}
