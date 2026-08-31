@@ -1,0 +1,77 @@
+# 세로 사진의 왼쪽 여백에 적을 세부 장소 이름 (2026-08-30)
+#
+# 검수자 — "세로는 ① + 왼쪽 여백에 도시·영문·(파악 가능하다면 세부 장소 이름)·날짜"
+#
+# ★ 확실한 것만 적는다. 비워 두면 도시 이름과 날짜만 나온다.
+#   틀린 이름을 화면에 박느니 안 적는 것이 낫다.
+#
+# 형식 —  폴더/파일 | 한글 | 영문
+
+2005.12.09-세고비아/PC090024.JPG   | 세고비아 대성당      | Catedral de Segovia
+2005.12.09-세고비아/PC090030.JPG   |                      |
+2005.12.09-세고비아/PC090031.JPG   |                      |
+2005.12.09-세고비아/PC090035.JPG   | 알카사르             | Alcázar de Segovia
+2005.12.09-세고비아/PC090018.JPG   |                      |
+
+2005.12.10-세비야/PC100004.JPG     | 세비야 대성당        | Catedral de Sevilla
+2005.12.10-세비야/PC100006.JPG     | 세비야 대성당        | Catedral de Sevilla
+2005.12.10-세비야/PC100007.JPG     | 세비야 대성당        | Catedral de Sevilla
+2005.12.10-세비야/PC100015.JPG     | 세비야 대성당        | Catedral de Sevilla
+2005.12.10-세비야/PC100019.JPG     | 세비야 대성당        | Catedral de Sevilla
+2005.12.10-세비야/PC100021.JPG     | 세비야 대성당        | Catedral de Sevilla
+2005.12.10-세비야/PC100030.JPG     | 히랄다               | La Giralda
+2005.12.10-세비야/PC100031.JPG     | 히랄다               | La Giralda
+2005.12.10-세비야/PC100036.JPG     |                      |
+
+2005.12.11-론다/P1010093.JPG       |                      |
+2005.12.11-론다/P1010104.JPG       | 누에보 다리          | Puente Nuevo
+2005.12.11-론다/P1010109.JPG       | 타호 협곡            | El Tajo
+2005.12.11-론다/P1010115.JPG       |                      |
+2005.12.11-론다/P1010118.JPG       | 소코로 광장          | Plaza del Socorro
+2005.12.11-론다/P1010124.JPG       |                      |
+2005.12.11-론다/P1010127.JPG       |                      |
+
+2005.12.12-그라나다/P1010140.JPG   | 알람브라             | La Alhambra
+2005.12.12-그라나다/P1010143.JPG   | 알람브라 · 메수아르궁 | Alhambra · Mexuar
+2005.12.12-그라나다/P1010146.JPG   | 아라야네스 중정      | Patio de los Arrayanes
+2005.12.12-그라나다/P1010148.JPG   | 알람브라             | La Alhambra
+2005.12.12-그라나다/P1010154.JPG   | 헤네랄리페           | Generalife
+2005.12.12-그라나다/P1010155.JPG   | 아라야네스 중정      | Patio de los Arrayanes
+2005.12.12-그라나다/P1010156.JPG   | 아라야네스 중정      | Patio de los Arrayanes
+2005.12.12-그라나다/P1010172.JPG   | 알카사바             | Alcazaba
+2005.12.12-그라나다/P1010178.JPG   | 사자의 중정          | Patio de los Leones
+2005.12.12-그라나다/P1010180.JPG   | 알람브라             | La Alhambra
+2005.12.12-그라나다/P1010181.JPG   | 알람브라             | La Alhambra
+2005.12.12-그라나다/P1010182.JPG   | 사자의 중정          | Patio de los Leones
+2005.12.12-그라나다/P1010185.JPG   | 알람브라             | La Alhambra
+2005.12.12-그라나다/P1010186.JPG   | 헤네랄리페           | Generalife
+2005.12.12-그라나다/P1010187.JPG   | 헤네랄리페           | Generalife
+2005.12.12-그라나다/P1010190.JPG   | 알람브라             | La Alhambra
+2005.12.12-그라나다/P1010191.JPG   |                      |
+2005.12.12-그라나다/P1010192.JPG   | 알람브라             | La Alhambra
+2005.12.12-그라나다/P1010194.JPG   | 알람브라             | La Alhambra
+2005.12.12-그라나다/P1010198.JPG   |                      |
+2005.12.12-그라나다/P1010200.JPG   | 카를로스 5세 궁전    | Palacio de Carlos V
+2005.12.12-그라나다/P1010210.JPG   | 알카사바             | Alcazaba
+2005.12.12-그라나다/P1010218.JPG   |                      |
+
+2005.12.13-바르셀로나/P1010008.JPG | 람블라스             | La Rambla
+2005.12.13-바르셀로나/P1010012.JPG | 카사 밀라            | Casa Milà
+2005.12.13-바르셀로나/P1010013.JPG |                      |
+2005.12.13-바르셀로나/P1010017.JPG | 사그라다 파밀리아    | Sagrada Família
+2005.12.13-바르셀로나/P1010015.JPG | 사그라다 파밀리아    | Sagrada Família
+2005.12.13-바르셀로나/P1010018.JPG | 사그라다 파밀리아    | Sagrada Família
+2005.12.13-바르셀로나/P1010019.JPG | 사그라다 파밀리아    | Sagrada Família
+2005.12.13-바르셀로나/P1010020.JPG | 사그라다 파밀리아    | Sagrada Família
+2005.12.13-바르셀로나/P1010021.JPG | 사그라다 파밀리아    | Sagrada Família
+2005.12.13-바르셀로나/P1010022.JPG | 사그라다 파밀리아    | Sagrada Família
+
+2005.12.14-바르셀로나/P1010049.JPG | 몬세라트 산악열차    | Cremallera de Montserrat
+2005.12.14-바르셀로나/P1010051.JPG | 몬세라트             | Montserrat
+2005.12.14-바르셀로나/P1010054.JPG | 몬세라트 수도원      | Monestir de Montserrat
+2005.12.14-바르셀로나/P1010058.JPG | 몬세라트 수도원      | Monestir de Montserrat
+2005.12.14-바르셀로나/P1010059.JPG | 몬세라트 수도원      | Monestir de Montserrat
+2005.12.14-바르셀로나/P1010060.JPG | 몬세라트 수도원      | Monestir de Montserrat
+2005.12.14-바르셀로나/P1010079.JPG | 몬세라트 산악열차    | Cremallera de Montserrat
+2005.12.14-바르셀로나/P1010080.JPG | 몬세라트             | Montserrat
+2005.12.14-바르셀로나/P1010091.JPG | 몬세라트             | Montserrat
